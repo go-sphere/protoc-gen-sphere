@@ -11,7 +11,7 @@ by [protoc-gen-go-http](https://github.com/go-kratos/kratos/tree/main/cmd/protoc
 To install `protoc-gen-sphere`, use the following command:
 
 ```bash
-go install github.com/TBXark/sphere/cmd/protoc-gen-sphere@latest
+go install github.com/go-sphere/protoc-gen-sphere@latest
 ```
 
 
@@ -26,12 +26,12 @@ The behavior of `protoc-gen-sphere` can be customized with the following paramet
 - **`swagger_auth_header`**: The comment for the authorization header in generated Swagger documentation. (Default: `// @Param Authorization header string false "Bearer token"`)
 - **`router_type`**: The fully qualified Go type for the router (e.g., `github.com/gin-gonic/gin;IRouter`). (Default: `github.com/gin-gonic/gin;IRouter`)
 - **`context_type`**: The fully qualified Go type for the request context (e.g., `github.com/gin-gonic/gin;Context`). (Default: `github.com/gin-gonic/gin;Context`)
-- **`data_resp_type`**: The fully qualified Go type for the data response model, which must support generics. (Default: `github.com/TBXark/sphere/server/ginx;DataResponse`)
-- **`error_resp_type`**: The fully qualified Go type for the error response model. (Default: `github.com/TBXark/sphere/server/ginx;ErrorResponse`)
-- **`server_handler_func`**: The wrapper function for handling server responses. (Default: `github.com/TBXark/sphere/server/ginx;WithJson`)
-- **`parse_json_func`**: The function used to parse JSON request bodies. (Default: `github.com/TBXark/sphere/server/ginx;ShouldBindJSON`)
-- **`parse_uri_func`**: The function used to parse URI parameters. (Default: `github.com/TBXark/sphere/server/ginx;ShouldBindUri`)
-- **`parse_form_func`**: The function used to parse form data/query parameters. (Default: `github.com/TBXark/sphere/server/ginx;ShouldBindQuery`)
+- **`data_resp_type`**: The fully qualified Go type for the data response model, which must support generics. (Default: `github.com/go-sphere/sphere/server/ginx;DataResponse`)
+- **`error_resp_type`**: The fully qualified Go type for the error response model. (Default: `github.com/go-sphere/sphere/server/ginx;ErrorResponse`)
+- **`server_handler_func`**: The wrapper function for handling server responses. (Default: `github.com/go-sphere/sphere/server/ginx;WithJson`)
+- **`parse_json_func`**: The function used to parse JSON request bodies. (Default: `github.com/go-sphere/sphere/server/ginx;ShouldBindJSON`)
+- **`parse_uri_func`**: The function used to parse URI parameters. (Default: `github.com/go-sphere/sphere/server/ginx;ShouldBindUri`)
+- **`parse_form_func`**: The function used to parse form data/query parameters. (Default: `github.com/go-sphere/sphere/server/ginx;ShouldBindQuery`)
 
 
 ## Usage with Buf
@@ -49,7 +49,7 @@ managed:
       module: buf.build/bufbuild/protovalidate
   override:
     - file_option: go_package_prefix
-      value: github.com/TBXark/sphere/layout/api
+      value: github.com/go-sphere/sphere-layout/api
 plugins:
   - local: protoc-gen-sphere
     out: api

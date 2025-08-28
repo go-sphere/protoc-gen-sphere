@@ -15,7 +15,7 @@ import (
 const (
 	swaggerAuthComment = "// @Param Authorization header string false \"Bearer token\""
 	defaultGinPackage  = "github.com/gin-gonic/gin"
-	defaultGinxPackage = "github.com/TBXark/sphere/server/ginx"
+	defaultGinxPackage = "github.com/go-sphere/sphere/server/ginx"
 )
 
 var (
