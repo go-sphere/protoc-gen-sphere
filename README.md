@@ -58,4 +58,228 @@ plugins:
       - swagger_auth_header=// @Security ApiKeyAuth
 ```
 
-You will also need to configure the `protoc-gen-sphere` plugin in your `buf.gen.yaml` so that `buf` knows how to execute it.
+## Prerequisites
+
+You need to have the following dependencies in your project. Add them to your `buf.yaml`:
+
+```yaml
+deps:
+  - buf.build/googleapis/googleapis
+  - buf.build/bufbuild/protovalidate
+  - buf.build/go-sphere/binding
+```
+
+## Proto Definition Example
+
+Here's how to define services with HTTP annotations in your `.proto` files:
+
+```protobuf
+syntax = "proto3";
+
+package shared.v1;
+
+import "buf/validate/validate.proto";
+import "google/api/annotations.proto";
+import "sphere/binding/binding.proto";
+
+service TestService {
+  rpc RunTest(RunTestRequest) returns (RunTestResponse) {
+    option (google.api.http) = {
+      post: "/api/test/{path_test1}/second/{path_test2}"
+      body: "*"
+    };
+  }
+
+  // test comment line1
+  // test comment line2
+  // test comment line3
+  rpc BodyPathTest(BodyPathTestRequest) returns (BodyPathTestResponse) {
+    option (google.api.http) = {
+      post: "/api/test/body_path_test"
+      body: "request"
+      response_body: "response"
+    };
+  }
+}
+
+message RunTestRequest {
+  string field_test1 = 1;
+  int64 field_test2 = 2;
+  string path_test1 = 3 [(sphere.binding.location) = BINDING_LOCATION_URI];
+  int64 path_test2 = 4 [(sphere.binding.location) = BINDING_LOCATION_URI];
+  string query_test1 = 5 [
+    (buf.validate.field).required = true,
+    (sphere.binding.location) = BINDING_LOCATION_QUERY
+  ];
+  int64 query_test2 = 6 [(sphere.binding.location) = BINDING_LOCATION_QUERY];
+}
+
+message RunTestResponse {
+  string field_test1 = 1;
+  int64 field_test2 = 2;
+  string path_test1 = 3;
+  int64 path_test2 = 4;
+  string query_test1 = 5;
+  int64 query_test2 = 6;
+}
+```
+
+## Generated Code
+
+The plugin generates Go code with HTTP handlers, route registration, and Swagger documentation. Here's what gets generated:
+
+### HTTP Handler Functions
+
+```go
+// @Summary RunTest
+// @Tags shared.v1,shared.v1.TestService
+// @Accept json
+// @Produce json
+// @Security ApiKeyAuth
+// @Param path_test1 path string true "path_test1"
+// @Param path_test2 path integer true "path_test2"
+// @Param query_test1 query string true "query_test1"
+// @Param query_test2 query integer false "query_test2"
+// @Param request body RunTestRequest true "request body"
+// @Success 200 {object} ginx.DataResponse[RunTestResponse]
+// @Failure 400,401,403,500,default {object} ginx.ErrorResponse
+// @Router /api/test/{path_test1}/second/{path_test2} [post]
+func _TestService_RunTest0_HTTP_Handler(srv TestServiceHTTPServer) func(ctx *gin.Context) {
+    return ginx.WithJson(func(ctx *gin.Context) (*RunTestResponse, error) {
+        var in RunTestRequest
+        if err := ginx.ShouldBindJSON(ctx, &in); err != nil {
+            return nil, err
+        }
+        if err := ginx.ShouldBindQuery(ctx, &in); err != nil {
+            return nil, err
+        }
+        if err := ginx.ShouldBindUri(ctx, &in); err != nil {
+            return nil, err
+        }
+        if err := protovalidate.Validate(&in); err != nil {
+            return nil, err
+        }
+        out, err := srv.RunTest(ctx, &in)
+        if err != nil {
+            return nil, err
+        }
+        return out, nil
+    })
+}
+```
+
+### Service Interface
+
+```go
+type TestServiceHTTPServer interface {
+    // BodyPathTest test comment line1
+    // test comment line2
+    // test comment line3
+    BodyPathTest(context.Context, *BodyPathTestRequest) (*BodyPathTestResponse, error)
+    RunTest(context.Context, *RunTestRequest) (*RunTestResponse, error)
+}
+```
+
+### Route Registration
+
+```go
+func RegisterTestServiceHTTPServer(route gin.IRouter, srv TestServiceHTTPServer) {
+    r := route.Group("/")
+    r.POST("/api/test/:path_test1/second/:path_test2", _TestService_RunTest0_HTTP_Handler(srv))
+    r.POST("/api/test/body_path_test", _TestService_BodyPathTest0_HTTP_Handler(srv))
+}
+```
+
+### Constants and Endpoints
+
+```go
+const OperationTestServiceRunTest = "/shared.v1.TestService/RunTest"
+const OperationTestServiceBodyPathTest = "/shared.v1.TestService/BodyPathTest"
+
+var EndpointsTestService = [...][3]string{
+    {OperationTestServiceRunTest, "POST", "/api/test/:path_test1/second/:path_test2"},
+    {OperationTestServiceBodyPathTest, "POST", "/api/test/body_path_test"},
+}
+```
+
+## Usage in Code
+
+### Implementing the Service
+
+```go
+type testService struct {
+    // your dependencies
+}
+
+func (s *testService) RunTest(ctx context.Context, req *sharedv1.RunTestRequest) (*sharedv1.RunTestResponse, error) {
+    // your business logic
+    return &sharedv1.RunTestResponse{
+        FieldTest1: req.FieldTest1,
+        FieldTest2: req.FieldTest2,
+        PathTest1:  req.PathTest1,
+        PathTest2:  req.PathTest2,
+        QueryTest1: req.QueryTest1,
+        QueryTest2: req.QueryTest2,
+    }, nil
+}
+
+func (s *testService) BodyPathTest(ctx context.Context, req *sharedv1.BodyPathTestRequest) (*sharedv1.BodyPathTestResponse, error) {
+    // your business logic
+    return &sharedv1.BodyPathTestResponse{
+        Response: []*sharedv1.BodyPathTestResponse_Response{
+            {
+                FieldTest1: req.Request.FieldTest1,
+                FieldTest2: req.Request.FieldTest2,
+            },
+        },
+    }, nil
+}
+```
+
+### Registering Routes
+
+```go
+func main() {
+    r := gin.New()
+    
+    srv := &testService{}
+    sharedv1.RegisterTestServiceHTTPServer(r, srv)
+    
+    r.Run(":8080")
+}
+```
+
+## Features
+
+- **Automatic HTTP Handler Generation**: Creates Gin handlers from protobuf service definitions
+- **Request Binding**: Automatically binds JSON body, query parameters, and URI parameters
+- **Validation Integration**: Integrates with `protovalidate` for request validation
+- **Swagger Documentation**: Generates Swagger/OpenAPI comments for each endpoint
+- **Response Body Customization**: Supports custom response body fields via `response_body` option
+- **Flexible Binding**: Works with sphere binding annotations for fine-grained control
+- **Error Handling**: Integrates with sphere error handling framework
+- **Route Constants**: Generates operation constants and endpoint arrays for easy reference
+
+## HTTP Annotations Support
+
+The plugin supports the following Google API HTTP annotations:
+
+- `get`, `post`, `put`, `patch`, `delete`: HTTP methods
+- `body`: Specifies the request body field (`*` for entire message)
+- `response_body`: Specifies the response body field
+- Path parameters: `{field_name}` in the URL path
+- Additional bindings: Multiple HTTP rules for the same RPC
+
+## Binding Locations
+
+Fields can be bound to different parts of the HTTP request using sphere binding annotations:
+
+- `BINDING_LOCATION_BODY`: JSON request body (default)
+- `BINDING_LOCATION_QUERY`: Query parameters
+- `BINDING_LOCATION_URI`: Path parameters
+- `BINDING_LOCATION_HEADER`: HTTP headers
+- `BINDING_LOCATION_FORM`: Form data
+
+## Customization Options
+
+All the configuration flags allow you to customize the generated code to work with different frameworks and response types. The default configuration is optimized for the sphere framework with Gin router.
