@@ -254,12 +254,18 @@ func buildMethodDesc(g *protogen.GeneratedFile, m *protogen.Method, rule *parser
 		return nil, err
 	}
 
+	headers, err := parser.GinHeaderParams(m)
+	if err != nil {
+		return nil, err
+	}
+
 	swag := &parser.SwagParams{
 		Method:        rule.Method,
 		Path:          parser.ConvertGinToSwaggerPath(route),
 		Auth:          conf.swaggerAuth,
 		PathVars:      vars,
 		QueryVars:     forms,
+		HeaderVars:    headers,
 		Body:          rule.Body,
 		ResponseBody:  rule.ResponseBody,
 		DataResponse:  conf.packageDesc.DataResponseType,
@@ -314,6 +320,7 @@ func buildMethodDesc(g *protogen.GeneratedFile, m *protogen.Method, rule *parser
 		HasVars:      len(vars) > 0,
 		HasQuery:     len(forms) > 0,
 		HasBody:      rule.HasBody,
+		HasHeader:    len(headers) > 0,
 		NeedValidate: needValidate,
 
 		Swagger: swagger,

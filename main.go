@@ -32,6 +32,7 @@ var (
 	errorRespType = flag.String("error_resp_type", defaultGinxPackage+";ErrorResponse", "error response type")
 	dataRespType  = flag.String("data_resp_type", defaultGinxPackage+";DataResponse", "data response type, must support generic")
 
+	parseHeaderFunc   = flag.String("parse_header_func", defaultGinxPackage+";ShouldBindHeader", "parse header func")
 	parseJsonFunc     = flag.String("parse_json_func", defaultGinxPackage+";ShouldBindJSON", "parse json func")
 	parseUriFunc      = flag.String("parse_uri_func", defaultGinxPackage+";ShouldBindUri", "parse uri func")
 	parseFormFunc     = flag.String("parse_form_func", defaultGinxPackage+";ShouldBindQuery", "parse form func")
@@ -102,6 +103,11 @@ func extractConfig() (*http.Config, error) {
 	if err != nil {
 		return nil, err
 	}
+
+	_parseHeaderFunc, err := parseGoIdent(*parseHeaderFunc)
+	if err != nil {
+		return nil, err
+	}
 	_parseJsonFunc, err := parseGoIdent(*parseJsonFunc)
 	if err != nil {
 		return nil, err
@@ -128,6 +134,7 @@ func extractConfig() (*http.Config, error) {
 		DataRespType:  _dataRespType,
 
 		ServerHandlerFunc: _serverHandlerFunc,
+		ParseHeaderFunc:   _parseHeaderFunc,
 		ParseJsonFunc:     _parseJsonFunc,
 		ParseUriFunc:      _parseUriFunc,
 		ParseFormFunc:     _parseFormFunc,

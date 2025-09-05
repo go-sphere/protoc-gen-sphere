@@ -49,8 +49,9 @@ type SwagParams struct {
 	Path   string
 	Auth   string
 
-	PathVars  []URIParamsField
-	QueryVars []QueryFormField
+	PathVars   []URIParamsField
+	QueryVars  []QueryFormField
+	HeaderVars []HeaderField
 
 	Body         string
 	ResponseBody string
@@ -87,6 +88,13 @@ func BuildAnnotations(g *protogen.GeneratedFile, m *protogen.Method, config *Swa
 	// Add authentication if specified
 	if config.Auth != "" {
 		builder.WriteString(config.Auth + "\n")
+	}
+
+	// Add header parameters
+	for _, param := range config.HeaderVars {
+		paramType := buildSwaggerParamType(g, param.Field)
+		required := isFieldRequired(param.Field)
+		builder.WriteString(fmt.Sprintf("// @Param %s header %s %v \"%s\"\n", param.Name, paramType, required, param.Name))
 	}
 
 	// Add path parameters

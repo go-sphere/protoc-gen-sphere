@@ -17,6 +17,7 @@ type Config struct {
 	DataRespType  protogen.GoIdent
 
 	ServerHandlerFunc protogen.GoIdent
+	ParseHeaderFunc   protogen.GoIdent
 	ParseJsonFunc     protogen.GoIdent
 	ParseUriFunc      protogen.GoIdent
 	ParseFormFunc     protogen.GoIdent
@@ -37,6 +38,7 @@ func NewGenConf(g *protogen.GeneratedFile, conf *Config) *GenConfig {
 		ErrorResponseType: g.QualifiedGoIdent(conf.ErrorRespType),
 		DataResponseType:  g.QualifiedGoIdent(conf.DataRespType),
 
+		ParseHeaderFunc:          g.QualifiedGoIdent(conf.ParseHeaderFunc),
 		ParseJsonFunc:            g.QualifiedGoIdent(conf.ParseJsonFunc),
 		ParseUriFunc:             g.QualifiedGoIdent(conf.ParseUriFunc),
 		ParseFormFunc:            g.QualifiedGoIdent(conf.ParseFormFunc),

@@ -29,6 +29,7 @@ The behavior of `protoc-gen-sphere` can be customized with the following paramet
 - **`data_resp_type`**: The fully qualified Go type for the data response model, which must support generics. (Default: `github.com/go-sphere/sphere/server/ginx;DataResponse`)
 - **`error_resp_type`**: The fully qualified Go type for the error response model. (Default: `github.com/go-sphere/sphere/server/ginx;ErrorResponse`)
 - **`server_handler_func`**: The wrapper function for handling server responses. (Default: `github.com/go-sphere/sphere/server/ginx;WithJson`)
+- **`parse_header_func`**: The function used to parse header parameters. (Default: `github.com/go-sphere/sphere/server/ginx;ShouldBindHeader`)
 - **`parse_json_func`**: The function used to parse JSON request bodies. (Default: `github.com/go-sphere/sphere/server/ginx;ShouldBindJSON`)
 - **`parse_uri_func`**: The function used to parse URI parameters. (Default: `github.com/go-sphere/sphere/server/ginx;ShouldBindUri`)
 - **`parse_form_func`**: The function used to parse form data/query parameters. (Default: `github.com/go-sphere/sphere/server/ginx;ShouldBindQuery`)
@@ -278,7 +279,6 @@ Fields can be bound to different parts of the HTTP request using sphere binding 
 - `BINDING_LOCATION_QUERY`: Query parameters
 - `BINDING_LOCATION_URI`: Path parameters
 - `BINDING_LOCATION_HEADER`: HTTP headers
-- `BINDING_LOCATION_FORM`: Form data
 
 ## Customization Options
 
