@@ -13,14 +13,11 @@ type Config struct {
 
 	RouterType    protogen.GoIdent
 	ContextType   protogen.GoIdent
+	HandlerType   protogen.GoIdent
 	ErrorRespType protogen.GoIdent
 	DataRespType  protogen.GoIdent
 
 	ServerHandlerFunc protogen.GoIdent
-	ParseHeaderFunc   protogen.GoIdent
-	ParseJsonFunc     protogen.GoIdent
-	ParseUriFunc      protogen.GoIdent
-	ParseFormFunc     protogen.GoIdent
 }
 
 type GenConfig struct {
@@ -34,14 +31,11 @@ func NewGenConf(g *protogen.GeneratedFile, conf *Config) *GenConfig {
 	pkgDesc := &template.PackageDesc{
 		RouterType:  g.QualifiedGoIdent(conf.RouterType),
 		ContextType: g.QualifiedGoIdent(conf.ContextType),
+		HandlerType: g.QualifiedGoIdent(conf.HandlerType),
 
 		ErrorResponseType: g.QualifiedGoIdent(conf.ErrorRespType),
 		DataResponseType:  g.QualifiedGoIdent(conf.DataRespType),
 
-		ParseHeaderFunc:          g.QualifiedGoIdent(conf.ParseHeaderFunc),
-		ParseJsonFunc:            g.QualifiedGoIdent(conf.ParseJsonFunc),
-		ParseUriFunc:             g.QualifiedGoIdent(conf.ParseUriFunc),
-		ParseFormFunc:            g.QualifiedGoIdent(conf.ParseFormFunc),
 		ServerHandlerWrapperFunc: g.QualifiedGoIdent(conf.ServerHandlerFunc),
 	}
 	genConf := &GenConfig{

@@ -61,6 +61,7 @@ type MethodDesc struct {
 type PackageDesc struct {
 	RouterType  string
 	ContextType string
+	HandlerType string
 
 	ErrorResponseType string
 	DataResponseType  string

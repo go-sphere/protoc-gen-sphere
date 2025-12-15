@@ -13,9 +13,9 @@ import (
 )
 
 const (
-	swaggerAuthComment = "// @Param Authorization header string false \"Bearer token\""
-	defaultGinPackage  = "github.com/gin-gonic/gin"
-	defaultGinxPackage = "github.com/go-sphere/sphere/server/ginx"
+	swaggerAuthComment  = "// @Param Authorization header string false \"Bearer token\""
+	defaultHTTPxPackage = "github.com/go-sphere/httpx"
+	defaultHTTPzPackage = "github.com/go-sphere/sphere/server/httpz"
 )
 
 var (
@@ -27,16 +27,12 @@ var (
 	templateFile      = flag.String("template_file", "", "template file, if not set, use default template")
 	swaggerAuthHeader = flag.String("swagger_auth_header", swaggerAuthComment, "swagger auth header")
 
-	routerType    = flag.String("router_type", defaultGinPackage+";IRouter", "router type")
-	contextType   = flag.String("context_type", defaultGinPackage+";Context", "context type")
-	errorRespType = flag.String("error_resp_type", defaultGinxPackage+";ErrorResponse", "error response type")
-	dataRespType  = flag.String("data_resp_type", defaultGinxPackage+";DataResponse", "data response type, must support generic")
-
-	parseHeaderFunc   = flag.String("parse_header_func", defaultGinxPackage+";ShouldBindHeader", "parse header func")
-	parseJsonFunc     = flag.String("parse_json_func", defaultGinxPackage+";ShouldBindJSON", "parse json func")
-	parseUriFunc      = flag.String("parse_uri_func", defaultGinxPackage+";ShouldBindUri", "parse uri func")
-	parseFormFunc     = flag.String("parse_form_func", defaultGinxPackage+";ShouldBindQuery", "parse form func")
-	serverHandlerFunc = flag.String("server_handler_func", defaultGinxPackage+";WithJson", "server handler func, must support generic")
+	routerType        = flag.String("router_type", defaultHTTPxPackage+";Router", "router type")
+	contextType       = flag.String("context_type", defaultHTTPxPackage+";Context", "context type")
+	handlerType       = flag.String("handler_type", defaultHTTPxPackage+";Handler", "handler type")
+	errorRespType     = flag.String("error_resp_type", defaultHTTPzPackage+";ErrorResponse", "error response type")
+	dataRespType      = flag.String("data_resp_type", defaultHTTPzPackage+";DataResponse", "data response type, must support generic")
+	serverHandlerFunc = flag.String("server_handler_func", defaultHTTPzPackage+";WithJson", "server handler func, must support generic")
 )
 
 func main() {
@@ -90,6 +86,10 @@ func extractConfig() (*http.Config, error) {
 	if err != nil {
 		return nil, err
 	}
+	_handlerType, err := parseGoIdent(*handlerType)
+	if err != nil {
+		return nil, err
+	}
 	_errorRespType, err := parseGoIdent(*errorRespType)
 	if err != nil {
 		return nil, err
@@ -104,23 +104,6 @@ func extractConfig() (*http.Config, error) {
 		return nil, err
 	}
 
-	_parseHeaderFunc, err := parseGoIdent(*parseHeaderFunc)
-	if err != nil {
-		return nil, err
-	}
-	_parseJsonFunc, err := parseGoIdent(*parseJsonFunc)
-	if err != nil {
-		return nil, err
-	}
-	_parseUriFunc, err := parseGoIdent(*parseUriFunc)
-	if err != nil {
-		return nil, err
-	}
-	_parseFormFunc, err := parseGoIdent(*parseFormFunc)
-	if err != nil {
-		return nil, err
-	}
-
 	conf := &http.Config{
 		Omitempty:       *omitempty,
 		OmitemptyPrefix: *omitemptyPrefix,
@@ -130,14 +113,11 @@ func extractConfig() (*http.Config, error) {
 
 		RouterType:    _routerType,
 		ContextType:   _contextType,
+		HandlerType:   _handlerType,
 		ErrorRespType: _errorRespType,
 		DataRespType:  _dataRespType,
 
 		ServerHandlerFunc: _serverHandlerFunc,
-		ParseHeaderFunc:   _parseHeaderFunc,
-		ParseJsonFunc:     _parseJsonFunc,
-		ParseUriFunc:      _parseUriFunc,
-		ParseFormFunc:     _parseFormFunc,
 	}
 	return conf, nil
 }

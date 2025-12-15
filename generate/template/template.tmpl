@@ -26,26 +26,26 @@ type {{.ServiceType}}HTTPServer interface {
 	{{- if ne .Swagger ""}}
 	{{.Swagger}}
     {{- end }}
-func _{{$svrType}}_{{.Name}}{{.Num}}_HTTP_Handler(srv {{$svrType}}HTTPServer) func(ctx *{{$packageDesc.ContextType}})  {
-	return {{$packageDesc.ServerHandlerWrapperFunc}}(func(ctx *{{$packageDesc.ContextType}}) ({{.Response}}, error) {
+func _{{$svrType}}_{{.Name}}{{.Num}}_HTTP_Handler(srv {{$svrType}}HTTPServer) {{$packageDesc.HandlerType}}  {
+	return {{$packageDesc.ServerHandlerWrapperFunc}}(func(ctx {{$packageDesc.ContextType}}) ({{.Response}}, error) {
 		var in {{.Request}}
-        {{- if .HasHeader}}
-        if err := {{$packageDesc.ParseHeaderFunc}}(ctx, &in); err != nil {
-            return nil, err
-        }
-        {{- end}}
 		{{- if .HasBody}}
-		if err := {{$packageDesc.ParseJsonFunc}}(ctx, &in{{.Body}}); err != nil {
+		if err := ctx.BindJSON(&in{{.Body}}); err != nil {
+			return nil, err
+		}
+		{{- end}}
+		{{- if .HasHeader}}
+		if err := ctx.BindHeader(&in); err != nil {
 			return nil, err
 		}
 		{{- end}}
 		{{- if .HasQuery}}
-		if err := {{$packageDesc.ParseFormFunc}}(ctx, &in); err != nil {
+		if err := ctx.BindQuery(&in); err != nil {
 			return nil, err
 		}
 		{{- end}}
 		{{- if .HasVars}}
-		if err := {{$packageDesc.ParseUriFunc}}(ctx, &in); err != nil {
+		if err := ctx.BindURI(&in); err != nil {
 			return nil, err
 		}
 		{{- end}}
@@ -66,6 +66,6 @@ func _{{$svrType}}_{{.Name}}{{.Num}}_HTTP_Handler(srv {{$svrType}}HTTPServer) fu
 func Register{{.ServiceType}}HTTPServer(route {{.Package.RouterType}}, srv {{.ServiceType}}HTTPServer) {
 	r := route.Group("/")
 	{{- range .Methods}}
-	r.{{.Method}}("{{.Path}}", _{{$svrType}}_{{.Name}}{{.Num}}_HTTP_Handler(srv))
+	r.Handle("{{.Method}}", "{{.Path}}", _{{$svrType}}_{{.Name}}{{.Num}}_HTTP_Handler(srv))
 	{{- end}}
 }
