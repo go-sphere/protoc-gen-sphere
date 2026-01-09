@@ -113,6 +113,7 @@ message RunTestRequest {
     (sphere.binding.location) = BINDING_LOCATION_QUERY
   ];
   int64 query_test2 = 6 [(sphere.binding.location) = BINDING_LOCATION_QUERY];
+  optional string optional_query = 7 [(sphere.binding.location) = BINDING_LOCATION_QUERY]; // Will be marked as optional in Swagger
 }
 
 message RunTestResponse {
@@ -255,10 +256,11 @@ func main() {
 - **Automatic HTTP Handler Generation**: Creates Gin handlers from protobuf service definitions
 - **Request Binding**: Automatically binds JSON body, query parameters, and URI parameters
 - **Validation Integration**: Integrates with `protovalidate` for request validation
-- **Swagger Documentation**: Generates Swagger/OpenAPI comments for each endpoint
-- **Response Body Customization**: Supports custom response body fields via `response_body` option
+- **Proto3 Optional Support**: Correctly handles `optional` keyword for query, path, and header parameters in Swagger documentation
+- **Swagger Documentation**: Generates Swagger/OpenAPI comments for each endpoint with accurate required/optional field markers
+- **Response Body Customization**: Supports custom response body fields via `response_body` option, including nested arrays and maps
 - **Flexible Binding**: Works with sphere binding annotations for fine-grained control
-- **Error Handling**: Integrates with sphere error handling framework
+- **Error Handling**: Integrates with sphere error handling framework with proper error propagation
 - **Route Constants**: Generates operation constants and endpoint arrays for easy reference
 
 ## HTTP Annotations Support
@@ -279,6 +281,27 @@ Fields can be bound to different parts of the HTTP request using sphere binding 
 - `BINDING_LOCATION_QUERY`: Query parameters
 - `BINDING_LOCATION_URI`: Path parameters
 - `BINDING_LOCATION_HEADER`: HTTP headers
+
+### Optional Fields
+
+The plugin correctly handles proto3 `optional` keyword:
+
+- **Query/Header parameters**: `optional` fields are marked as `required=false` in Swagger (default behavior)
+- **Path parameters**: `optional` fields are marked as `required=false` in Swagger (though path params are typically required)
+- **Validation integration**: Works seamlessly with `buf.validate` constraints - if a field has `(buf.validate.field).required = true`, it will be marked as required regardless of the `optional` keyword
+
+Example:
+```protobuf
+optional string optional_field = 1 [(sphere.binding.location) = BINDING_LOCATION_QUERY];
+string required_field = 2 [
+  (buf.validate.field).required = true,
+  (sphere.binding.location) = BINDING_LOCATION_QUERY
+];
+```
+
+In the generated Swagger documentation:
+- `optional_field` → `@Param optional_field query string false "optional_field"`
+- `required_field` → `@Param required_field query string true "required_field"`
 
 ## Customization Options
 
