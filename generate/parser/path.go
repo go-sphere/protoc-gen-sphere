@@ -10,13 +10,25 @@ import (
 	"google.golang.org/protobuf/compiler/protogen"
 )
 
+var (
+	// Path pattern regex compiled once at package initialization
+	complexLiteralRegex  = regexp.MustCompile(`\{([^}=]+)=([^}*]+)/(\*+)\}`)
+	literalRegex         = regexp.MustCompile(`\{([^}=]+)=([^}*/]+)\}`)
+	doubleWildcardRegex  = regexp.MustCompile(`\{([^}=]+)=\*\*\}`)
+	singleWildcardRegex  = regexp.MustCompile(`\{([^}=]+)=\*\}`)
+	simpleParamRegex     = regexp.MustCompile(`\{([^}=]+)\}`)
+	multipleSlashRegex   = regexp.MustCompile(`/+`)
+	namedParamRegex      = regexp.MustCompile(`:([a-zA-Z_][a-zA-Z0-9_]*)`)
+	wildcardParamRegex   = regexp.MustCompile(`\*([a-zA-Z_][a-zA-Z0-9_]*)`)
+	nonAlphanumericRegex = regexp.MustCompile(`[^a-zA-Z0-9_]`)
+)
+
 func GinRoute(protoPath string) (string, error) {
 	if protoPath == "" {
 		return "", fmt.Errorf("proto path cannot be empty")
 	}
 	result := protoPath
 	// 1.  {param=literal/*} or {param=literal/**}
-	complexLiteralRegex := regexp.MustCompile(`\{([^}=]+)=([^}*]+)/(\*+)\}`)
 	result = complexLiteralRegex.ReplaceAllStringFunc(result, func(match string) string {
 		matches := complexLiteralRegex.FindStringSubmatch(match)
 		if len(matches) >= 4 {
@@ -35,7 +47,6 @@ func GinRoute(protoPath string) (string, error) {
 		return match
 	})
 	// 2. {param=literal} -> /literal
-	literalRegex := regexp.MustCompile(`\{([^}=]+)=([^}*/]+)\}`)
 	result = literalRegex.ReplaceAllStringFunc(result, func(match string) string {
 		matches := literalRegex.FindStringSubmatch(match)
 		if len(matches) >= 3 {
@@ -44,7 +55,6 @@ func GinRoute(protoPath string) (string, error) {
 		return match
 	})
 	// 3. {param=**} -> /*param
-	doubleWildcardRegex := regexp.MustCompile(`\{([^}=]+)=\*\*\}`)
 	result = doubleWildcardRegex.ReplaceAllStringFunc(result, func(match string) string {
 		matches := doubleWildcardRegex.FindStringSubmatch(match)
 		if len(matches) >= 2 {
@@ -54,7 +64,6 @@ func GinRoute(protoPath string) (string, error) {
 		return match
 	})
 	// 4.  {param=*} -> /:param
-	singleWildcardRegex := regexp.MustCompile(`\{([^}=]+)=\*\}`)
 	result = singleWildcardRegex.ReplaceAllStringFunc(result, func(match string) string {
 		matches := singleWildcardRegex.FindStringSubmatch(match)
 		if len(matches) >= 2 {
@@ -64,7 +73,6 @@ func GinRoute(protoPath string) (string, error) {
 		return match
 	})
 	// 5.  {param} -> /:param
-	simpleParamRegex := regexp.MustCompile(`\{([^}=]+)\}`)
 	result = simpleParamRegex.ReplaceAllStringFunc(result, func(match string) string {
 		matches := simpleParamRegex.FindStringSubmatch(match)
 		if len(matches) >= 2 {
@@ -73,7 +81,7 @@ func GinRoute(protoPath string) (string, error) {
 		}
 		return match
 	})
-	result = regexp.MustCompile(`/+`).ReplaceAllString(result, "/")
+	result = multipleSlashRegex.ReplaceAllString(result, "/")
 	if !strings.HasPrefix(result, "/") {
 		result = "/" + result
 	}
@@ -121,7 +129,6 @@ func GinURIParams(m *protogen.Method, route string) ([]URIParamsField, error) {
 func parseGinRoutePath(route string) map[string]bool {
 	params := make(map[string]bool)
 	// :param
-	namedParamRegex := regexp.MustCompile(`:([a-zA-Z_][a-zA-Z0-9_]*)`)
 	namedMatches := namedParamRegex.FindAllStringSubmatch(route, -1)
 	for _, match := range namedMatches {
 		if len(match) > 1 {
@@ -129,7 +136,6 @@ func parseGinRoutePath(route string) map[string]bool {
 		}
 	}
 	// *param
-	wildcardParamRegex := regexp.MustCompile(`\*([a-zA-Z_][a-zA-Z0-9_]*)`)
 	wildcardMatches := wildcardParamRegex.FindAllStringSubmatch(route, -1)
 	for _, match := range wildcardMatches {
 		if len(match) > 1 {
@@ -141,7 +147,6 @@ func parseGinRoutePath(route string) map[string]bool {
 
 func cleanParamName(paramName string) string {
 	cleaned := strings.ReplaceAll(paramName, ".", "_")
-	reg := regexp.MustCompile(`[^a-zA-Z0-9_]`)
-	cleaned = reg.ReplaceAllString(cleaned, "_")
+	cleaned = nonAlphanumericRegex.ReplaceAllString(cleaned, "_")
 	return cleaned
 }
