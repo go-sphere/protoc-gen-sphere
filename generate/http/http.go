@@ -121,13 +121,17 @@ func generateService(g *protogen.GeneratedFile, service *protogen.Service, conf 
 		rule, ok := proto.GetExtension(method.Desc.Options(), annotations.E_Http).(*annotations.HttpRule)
 		if rule != nil && ok {
 			for _, bind := range rule.AdditionalBindings {
-				if desc, err := buildHTTPRule(g, service, method, bind, conf); err == nil {
-					sd.Methods = append(sd.Methods, desc)
+				desc, err := buildHTTPRule(g, service, method, bind, conf)
+				if err != nil {
+					return err
 				}
-			}
-			if desc, err := buildHTTPRule(g, service, method, rule, conf); err == nil {
 				sd.Methods = append(sd.Methods, desc)
 			}
+			desc, err := buildHTTPRule(g, service, method, rule, conf)
+			if err != nil {
+				return err
+			}
+			sd.Methods = append(sd.Methods, desc)
 		} else if !conf.omitempty {
 			// Method with no http_rule defined, automatically generating a default POST method.
 			path := fmt.Sprintf("%s/%s/%s", conf.omitemptyPrefix, service.Desc.FullName(), method.Desc.Name())

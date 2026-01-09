@@ -27,9 +27,10 @@ var (
 	templateFile      = flag.String("template_file", "", "template file, if not set, use default template")
 	swaggerAuthHeader = flag.String("swagger_auth_header", swaggerAuthComment, "swagger auth header")
 
-	routerType        = flag.String("router_type", defaultHTTPxPackage+";Router", "router type")
-	contextType       = flag.String("context_type", defaultHTTPxPackage+";Context", "context type")
-	handlerType       = flag.String("handler_type", defaultHTTPxPackage+";Handler", "handler type")
+	routerType  = flag.String("router_type", defaultHTTPxPackage+";Router", "router type")
+	contextType = flag.String("context_type", defaultHTTPxPackage+";Context", "context type")
+	handlerType = flag.String("handler_type", defaultHTTPxPackage+";Handler", "handler type")
+
 	errorRespType     = flag.String("error_resp_type", defaultHTTPzPackage+";ErrorResponse", "error response type")
 	dataRespType      = flag.String("data_resp_type", defaultHTTPzPackage+";DataResponse", "data response type, must support generic")
 	serverHandlerFunc = flag.String("server_handler_func", defaultHTTPzPackage+";WithJson", "server handler func, must support generic")
