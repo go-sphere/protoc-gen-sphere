@@ -100,7 +100,8 @@ func BuildAnnotations(g *protogen.GeneratedFile, m *protogen.Method, config *Swa
 	// Add path parameters
 	for _, param := range config.PathVars {
 		paramType := buildSwaggerParamType(g, param.Field)
-		builder.WriteString(fmt.Sprintf("// @Param %s path %s true \"%s\"\n", param.Name, paramType, param.Name))
+		required := !param.Field.Desc.HasOptionalKeyword()
+		builder.WriteString(fmt.Sprintf("// @Param %s path %s %v \"%s\"\n", param.Name, paramType, required, param.Name))
 	}
 	// Add query parameters
 	for _, param := range config.QueryVars {
