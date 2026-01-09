@@ -93,20 +93,20 @@ func BuildAnnotations(g *protogen.GeneratedFile, m *protogen.Method, config *Swa
 	// Add header parameters
 	for _, param := range config.HeaderVars {
 		paramType := buildSwaggerParamType(g, param.Field)
-		required := isFieldRequired(param.Field)
+		required := isFieldRequired(param.Field, false)
 		builder.WriteString(fmt.Sprintf("// @Param %s header %s %v \"%s\"\n", param.Name, paramType, required, param.Name))
 	}
 
 	// Add path parameters
 	for _, param := range config.PathVars {
 		paramType := buildSwaggerParamType(g, param.Field)
-		required := !param.Field.Desc.HasOptionalKeyword()
+		required := isFieldRequired(param.Field, true)
 		builder.WriteString(fmt.Sprintf("// @Param %s path %s %v \"%s\"\n", param.Name, paramType, required, param.Name))
 	}
 	// Add query parameters
 	for _, param := range config.QueryVars {
 		paramType := buildSwaggerParamType(g, param.Field)
-		required := isFieldRequired(param.Field)
+		required := isFieldRequired(param.Field, false)
 		builder.WriteString(fmt.Sprintf("// @Param %s query %s %v \"%s\"\n", param.Name, paramType, required, param.Name))
 	}
 	// Add a request body
@@ -194,16 +194,23 @@ func buildSingularSwaggerParamType(g *protogen.GeneratedFile, field *protogen.Fi
 	}
 }
 
-func isFieldRequired(field *protogen.Field) bool {
-	opts := field.Desc.Options()
-	if opts == nil {
+func isFieldRequired(field *protogen.Field, defaultRequired bool) bool {
+	// If field has optional keyword, it's not required
+	if field.Desc.HasOptionalKeyword() {
 		return false
 	}
-	if proto.HasExtension(opts, validatepb.E_Field) {
+
+	// Check buf.validate required constraint
+	opts := field.Desc.Options()
+	if opts != nil && proto.HasExtension(opts, validatepb.E_Field) {
 		fieldConstraints := proto.GetExtension(opts, validatepb.E_Field).(*validatepb.FieldRules)
 		if fieldConstraints != nil {
 			return fieldConstraints.GetRequired()
 		}
 	}
-	return false
+
+	// Return default value based on parameter type
+	// Path parameters default to required (true)
+	// Query/Header parameters default to optional (false)
+	return defaultRequired
 }
