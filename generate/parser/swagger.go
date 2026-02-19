@@ -94,20 +94,20 @@ func BuildAnnotations(g *protogen.GeneratedFile, m *protogen.Method, config *Swa
 	for _, param := range config.HeaderVars {
 		paramType := buildSwaggerParamType(g, param.Field)
 		required := isFieldRequired(param.Field, false)
-		builder.WriteString(fmt.Sprintf("// @Param %s header %s %v \"%s\"\n", param.Name, paramType, required, param.Name))
+		_, _ = fmt.Fprintf(&builder, "// @Param %s header %s %v \"%s\"\n", param.Name, paramType, required, param.Name)
 	}
 
 	// Add path parameters
 	for _, param := range config.PathVars {
 		paramType := buildSwaggerParamType(g, param.Field)
 		required := isFieldRequired(param.Field, true)
-		builder.WriteString(fmt.Sprintf("// @Param %s path %s %v \"%s\"\n", param.Name, paramType, required, param.Name))
+		_, _ = fmt.Fprintf(&builder, "// @Param %s path %s %v \"%s\"\n", param.Name, paramType, required, param.Name)
 	}
 	// Add query parameters
 	for _, param := range config.QueryVars {
 		paramType := buildSwaggerParamType(g, param.Field)
 		required := isFieldRequired(param.Field, false)
-		builder.WriteString(fmt.Sprintf("// @Param %s query %s %v \"%s\"\n", param.Name, paramType, required, param.Name))
+		_, _ = fmt.Fprintf(&builder, "// @Param %s query %s %v \"%s\"\n", param.Name, paramType, required, param.Name)
 	}
 	// Add a request body
 	if _, ok := NoBodyMethods[config.Method]; !ok {
