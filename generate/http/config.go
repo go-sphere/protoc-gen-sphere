@@ -18,6 +18,7 @@ type Config struct {
 	DataRespType  protogen.GoIdent
 
 	ServerHandlerFunc protogen.GoIdent
+	ContextLoadFunc   string
 }
 
 type GenConfig struct {
@@ -37,6 +38,7 @@ func NewGenConf(g *protogen.GeneratedFile, conf *Config) *GenConfig {
 		DataResponseType:  g.QualifiedGoIdent(conf.DataRespType),
 
 		ServerHandlerWrapperFunc: g.QualifiedGoIdent(conf.ServerHandlerFunc),
+		ContextLoadFunc:          conf.ContextLoadFunc,
 	}
 	genConf := &GenConfig{
 		omitempty:       conf.Omitempty,

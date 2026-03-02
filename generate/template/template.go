@@ -73,6 +73,7 @@ type PackageDesc struct {
 	ValidateFunc    string
 
 	ServerHandlerWrapperFunc string
+	ContextLoadFunc          string
 }
 
 func (s *ServiceDesc) Execute() (string, error) {

@@ -54,7 +54,7 @@ func _{{$svrType}}_{{.Name}}{{.Num}}_HTTP_Handler(srv {{$svrType}}HTTPServer) {{
             return nil, err
         }
         {{- end}}
-		out, err := srv.{{.Name}}(ctx, &in)
+		out, err := srv.{{.Name}}(ctx{{$packageDesc.ContextLoadFunc}}, &in)
 		if err != nil {
 			return nil, err
 		}
