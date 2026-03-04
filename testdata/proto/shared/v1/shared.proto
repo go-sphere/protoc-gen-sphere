@@ -1,0 +1,10 @@
+syntax = "proto3";
+
+package shared.v1;
+
+
+enum TestEnum {
+  TEST_ENUM_UNSPECIFIED = 0;
+  TEST_ENUM_VALUE1 = 1;
+  TEST_ENUM_VALUE2 = 2;
+}

@@ -27,24 +27,3 @@ type GenConfig struct {
 	swaggerAuth     string
 	packageDesc     *template.PackageDesc
 }
-
-func NewGenConf(g *protogen.GeneratedFile, conf *Config) *GenConfig {
-	pkgDesc := &template.PackageDesc{
-		RouterType:  g.QualifiedGoIdent(conf.RouterType),
-		ContextType: g.QualifiedGoIdent(conf.ContextType),
-		HandlerType: g.QualifiedGoIdent(conf.HandlerType),
-
-		ErrorResponseType: g.QualifiedGoIdent(conf.ErrorRespType),
-		DataResponseType:  g.QualifiedGoIdent(conf.DataRespType),
-
-		ServerHandlerWrapperFunc: g.QualifiedGoIdent(conf.ServerHandlerFunc),
-		ContextLoadFunc:          conf.ContextLoadFunc,
-	}
-	genConf := &GenConfig{
-		omitempty:       conf.Omitempty,
-		omitemptyPrefix: conf.OmitemptyPrefix,
-		swaggerAuth:     conf.SwaggerAuth,
-		packageDesc:     pkgDesc,
-	}
-	return genConf
-}

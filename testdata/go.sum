@@ -1,0 +1,12 @@
+github.com/go-sphere/binding v0.0.4 h1:SB4Jjcsg4UIxiURCQVYRdSNIYZwT/dyRuu9H/4o0n30=
+github.com/go-sphere/binding v0.0.4/go.mod h1:0mukFqHNQULXOcTDSMsB3S+hfS/de+ooWUOQSQU1yrQ=
+github.com/go-sphere/httpx v0.0.2-beta.30.0.20260302014950-228491f299da h1:ivvHmgMAGgAUHTkoKZe9WwwvzUopk9ZDUyUNVYwoJ8Y=
+github.com/go-sphere/httpx v0.0.2-beta.30.0.20260302014950-228491f299da/go.mod h1:Vtyau99EFGlImJN/frGdbI8pfR39MojnWMyHXdCCw8U=
+github.com/go-sphere/sphere v0.0.3-beta.9.0.20260302023009-dfb249d5fdf2 h1:BnLdns+s1p++rELLn97yH9b+JgxVNIYEzqkhWSD4aTI=
+github.com/go-sphere/sphere v0.0.3-beta.9.0.20260302023009-dfb249d5fdf2/go.mod h1:WsROxB4N3dIAiToP3eex5FMp+fi5ON+yZHPSrz3IamE=
+github.com/google/go-cmp v0.7.0 h1:wk8382ETsv4JYUZwIsn6YpYiWiBsYLSJiTsyBybVuN8=
+github.com/google/go-cmp v0.7.0/go.mod h1:pXiqmnSA92OHEEa9HXL2W4E7lf9JzCmGVUdgjX3N/iU=
+google.golang.org/genproto/googleapis/api v0.0.0-20260226221140-a57be14db171 h1:tu/dtnW1o3wfaxCOjSLn5IRX4YDcJrtlpzYkhHhGaC4=
+google.golang.org/genproto/googleapis/api v0.0.0-20260226221140-a57be14db171/go.mod h1:M5krXqk4GhBKvB596udGL3UyjL4I1+cTbK0orROM9ng=
+google.golang.org/protobuf v1.36.11 h1:fV6ZwhNocDyBLK0dj+fg8ektcVegBBuEolpbTQyBNVE=
+google.golang.org/protobuf v1.36.11/go.mod h1:HTf+CrKn2C3g5S8VImy6tdcUvCska2kB7j23XfzDpco=

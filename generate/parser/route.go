@@ -4,10 +4,6 @@ import (
 	"fmt"
 	"regexp"
 	"strings"
-
-	bindingpb "github.com/go-sphere/binding/sphere/binding"
-
-	"google.golang.org/protobuf/compiler/protogen"
 )
 
 var (
@@ -23,7 +19,7 @@ var (
 	nonAlphanumericRegex = regexp.MustCompile(`[^a-zA-Z0-9_]`)
 )
 
-func GinRoute(protoPath string) (string, error) {
+func HTTPRoute(protoPath string) (string, error) {
 	if protoPath == "" {
 		return "", fmt.Errorf("proto path cannot be empty")
 	}
@@ -92,57 +88,14 @@ func GinRoute(protoPath string) (string, error) {
 	return result, nil
 }
 
-type URIParamsField struct {
-	Name     string
-	Wildcard bool
-	Field    *protogen.Field
-}
-
-func GinURIParams(m *protogen.Method, route string) ([]URIParamsField, error) {
-	var fields []URIParamsField
-	params := parseGinRoutePath(route)
-	for _, field := range m.Input.Fields {
-		name := string(field.Desc.Name())
-		wildcard, exist := params[name]
-		if exist {
-			if checkBindingLocation(m.Input, field, bindingpb.BindingLocation_BINDING_LOCATION_URI) {
-				fields = append(fields, URIParamsField{
-					Name:     name,
-					Wildcard: wildcard,
-					Field:    field,
-				})
-			} else {
-				return nil, fmt.Errorf("method `%s.%s` parameter `%s` is not bound to URI, but it is used in route `%s`. File: `%s`, Field: `%s`",
-					m.Parent.Desc.Name(),
-					m.Desc.Name(),
-					name,
-					route,
-					m.Parent.Location.SourceFile,
-					m.Input.Desc.Name(),
-				)
-			}
-		}
-	}
-	return fields, nil
-}
-
-func parseGinRoutePath(route string) map[string]bool {
-	params := make(map[string]bool)
-	// :param
-	namedMatches := namedParamRegex.FindAllStringSubmatch(route, -1)
-	for _, match := range namedMatches {
-		if len(match) > 1 {
-			params[match[1]] = false
-		}
-	}
-	// *param
-	wildcardMatches := wildcardParamRegex.FindAllStringSubmatch(route, -1)
-	for _, match := range wildcardMatches {
-		if len(match) > 1 {
-			params[match[1]] = true
-		}
-	}
-	return params
+func HTTPRouteToSwaggerRoute(ginPath string) string {
+	//  :params -> {params}
+	re := regexp.MustCompile(`:([a-zA-Z_][a-zA-Z0-9_]*)`)
+	swaggerPath := re.ReplaceAllString(ginPath, "{$1}")
+	//  *filepath -> {filepath}
+	re2 := regexp.MustCompile(`\*([a-zA-Z_][a-zA-Z0-9_]*)`)
+	swaggerPath = re2.ReplaceAllString(swaggerPath, "{$1}")
+	return swaggerPath
 }
 
 func cleanParamName(paramName string) string {

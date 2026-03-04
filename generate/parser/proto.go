@@ -7,7 +7,30 @@ import (
 	"google.golang.org/protobuf/reflect/protoreflect"
 )
 
-func FindProtoField(message *protogen.Message, keypath []string) *protogen.Field {
+type GeneratedFile struct {
+	g       *protogen.GeneratedFile
+	dummies map[protogen.GoImportPath]protogen.GoIdent
+}
+
+func NewGen(g *protogen.GeneratedFile) *GeneratedFile {
+	return &GeneratedFile{
+		g:       g,
+		dummies: make(map[protogen.GoImportPath]protogen.GoIdent),
+	}
+}
+
+func (g *GeneratedFile) QualifiedGoIdent(id protogen.GoIdent) string {
+	if _, ok := g.dummies[id.GoImportPath]; !ok {
+		g.dummies[id.GoImportPath] = id
+	}
+	return g.g.QualifiedGoIdent(id)
+}
+
+func (g *GeneratedFile) Dummies() map[protogen.GoImportPath]protogen.GoIdent {
+	return g.dummies
+}
+
+func ProtoKeyPathToField(message *protogen.Message, keypath []string) *protogen.Field {
 	if len(keypath) == 0 || message == nil {
 		return nil
 	}
@@ -22,7 +45,7 @@ func FindProtoField(message *protogen.Message, keypath []string) *protogen.Field
 		}
 
 		if field.Message != nil {
-			return FindProtoField(field.Message, keypath[1:])
+			return ProtoKeyPathToField(field.Message, keypath[1:])
 		}
 
 		if field.Oneof != nil {
@@ -32,7 +55,7 @@ func FindProtoField(message *protogen.Message, keypath []string) *protogen.Field
 						return oneofField
 					}
 					if len(keypath) > 2 && oneofField.Message != nil {
-						return FindProtoField(oneofField.Message, keypath[2:])
+						return ProtoKeyPathToField(oneofField.Message, keypath[2:])
 					}
 				}
 			}
@@ -41,13 +64,13 @@ func FindProtoField(message *protogen.Message, keypath []string) *protogen.Field
 	return nil
 }
 
-func ProtoKeyPath2GoKeyPath(message *protogen.Message, keypath []string) []string {
+func ProtoKeyPathToGoKeyPath(message *protogen.Message, keypath []string) []string {
 	if len(keypath) == 0 || message == nil {
 		return nil
 	}
 	goKeyPath := make([]string, 0, len(keypath))
 	for _, key := range keypath {
-		field := FindProtoField(message, []string{key})
+		field := ProtoKeyPathToField(message, []string{key})
 		if field == nil {
 			return nil
 		}
@@ -57,7 +80,7 @@ func ProtoKeyPath2GoKeyPath(message *protogen.Message, keypath []string) []strin
 	return goKeyPath
 }
 
-func ProtoTypeToGoType(g *protogen.GeneratedFile, field *protogen.Field, usePtrForMessage bool) string {
+func ProtoTypeToGoType(g *GeneratedFile, field *protogen.Field, usePtrForMessage bool) string {
 	switch {
 	case field.Desc.IsMap():
 		// For map, get key and value types
@@ -84,7 +107,7 @@ func ProtoTypeToGoType(g *protogen.GeneratedFile, field *protogen.Field, usePtrF
 	}
 }
 
-func singularProtoTypeToGoType(g *protogen.GeneratedFile, field *protogen.Field, usePtrForMessage bool) string {
+func singularProtoTypeToGoType(g *GeneratedFile, field *protogen.Field, usePtrForMessage bool) string {
 	switch field.Desc.Kind() {
 	case protoreflect.BoolKind:
 		return "bool"
@@ -132,5 +155,49 @@ func singularProtoTypeToGoType(g *protogen.GeneratedFile, field *protogen.Field,
 		return "any" // Fallback for unknown message types
 	default:
 		return "any" // Fallback for unknown types
+	}
+}
+
+func ProtoTypeToSwaggerType(g *GeneratedFile, field *protogen.Field) string {
+	switch {
+	case field.Desc.IsMap():
+		key := singularSwaggerParamType(g, field.Message.Fields[0])
+		val := singularSwaggerParamType(g, field.Message.Fields[1])
+		return fmt.Sprintf("map[%s]%s", key, val)
+	case field.Desc.IsList():
+		elemType := singularSwaggerParamType(g, field)
+		return fmt.Sprintf("[]%s", elemType)
+	default:
+		return singularSwaggerParamType(g, field)
+	}
+}
+
+func singularSwaggerParamType(g *GeneratedFile, field *protogen.Field) string {
+	switch field.Desc.Kind() {
+	case protoreflect.BoolKind:
+		return "boolean"
+	case protoreflect.Int32Kind, protoreflect.Sint32Kind, protoreflect.Uint32Kind,
+		protoreflect.Int64Kind, protoreflect.Sint64Kind, protoreflect.Uint64Kind,
+		protoreflect.Sfixed32Kind, protoreflect.Fixed32Kind,
+		protoreflect.Sfixed64Kind, protoreflect.Fixed64Kind:
+		return "integer"
+	case protoreflect.FloatKind, protoreflect.DoubleKind:
+		return "number"
+	case protoreflect.StringKind:
+		return "string"
+	case protoreflect.BytesKind:
+		return "string" // Swagger doesn't have a specific type for bytes, so we use string
+	case protoreflect.EnumKind:
+		if field.Enum != nil {
+			return g.QualifiedGoIdent(field.Enum.GoIdent)
+		}
+		return "integer"
+	case protoreflect.MessageKind:
+		if field.Message != nil {
+			return g.QualifiedGoIdent(field.Message.GoIdent)
+		}
+		return "any"
+	default:
+		return "any"
 	}
 }
