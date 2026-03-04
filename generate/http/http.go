@@ -57,15 +57,16 @@ func generateFileContent(plugin *protogen.Plugin, file *protogen.File, gen *prot
 	}
 
 	fileGen := parser.NewGen(gen)
+	fileGen.QualifiedGoIdent(contextPackage.Ident("Context"))
 	pkgDesc := &template.PackageDesc{
 		RouterType:  fileGen.QualifiedGoIdent(conf.RouterType),
 		ContextType: fileGen.QualifiedGoIdent(conf.ContextType),
 		HandlerType: fileGen.QualifiedGoIdent(conf.HandlerType),
 
 		ErrorResponseType: fileGen.QualifiedGoIdent(conf.ErrorRespType),
-		DataResponseType:  fileGen.QualifiedGoIdent(conf.DataRespType),
+		DataResponseType:  gen.QualifiedGoIdent(conf.DataRespType),
 
-		ServerHandlerWrapperFunc: fileGen.QualifiedGoIdent(conf.ServerHandlerFunc),
+		ServerHandlerWrapperFunc: gen.QualifiedGoIdent(conf.ServerHandlerFunc),
 		ContextLoadFunc:          conf.ContextLoadFunc,
 	}
 	genConf := &GenConfig{
@@ -91,7 +92,7 @@ func generateFileContent(plugin *protogen.Plugin, file *protogen.File, gen *prot
 		}
 		services = append(services, sd)
 	}
-	importLines := collectGoImport(file, fileGen, genConf)
+	importLines := collectGoImport(file, fileGen, conf, genConf)
 	for _, line := range importLines {
 		gen.P(line)
 	}
@@ -107,20 +108,23 @@ func generateFileContent(plugin *protogen.Plugin, file *protogen.File, gen *prot
 	return nil
 }
 
-func collectGoImport(file *protogen.File, gen *parser.GeneratedFile, conf *GenConfig) []string {
+func collectGoImport(file *protogen.File, gen *parser.GeneratedFile, conf *Config, genConf *GenConfig) []string {
 	lines := make([]string, 0)
 	didImport := make(map[protogen.GoImportPath]bool)
-	for _, ident := range []protogen.GoIdent{contextPackage.Ident("Context")} {
+	didImport[file.GoImportPath] = true
+	for _, ident := range gen.Dummies() {
 		if !didImport[ident.GoImportPath] {
 			didImport[ident.GoImportPath] = true
 			lines = append(lines, fmt.Sprintf("var _  = (*%s)(nil)", gen.QualifiedGoIdent(ident)))
 		}
 	}
-	for path, ident := range gen.Dummies() {
-		if !didImport[path] {
-			didImport[path] = true
-			lines = append(lines, fmt.Sprintf("var _  = (*%s)(nil)", gen.QualifiedGoIdent(ident)))
-		}
+	if !didImport[conf.ServerHandlerFunc.GoImportPath] {
+		didImport[conf.ServerHandlerFunc.GoImportPath] = true
+		lines = append(lines, fmt.Sprintf("var _  = %s[any]", gen.QualifiedGoIdent(conf.ServerHandlerFunc)))
+	}
+	if !didImport[conf.DataRespType.GoImportPath] {
+		didImport[conf.DataRespType.GoImportPath] = true
+		lines = append(lines, fmt.Sprintf("var _  = (*%s[any])(nil)", gen.QualifiedGoIdent(conf.DataRespType)))
 	}
 LOOP:
 	for _, service := range file.Services {
@@ -128,7 +132,7 @@ LOOP:
 			if hasValidateOptionsInMessage(method.Input) || slices.ContainsFunc(method.Input.Fields, hasValidateOptions) {
 				ident := validatePackage.Ident("Validate")
 				lines = append(lines, fmt.Sprintf("var _ = %s", gen.QualifiedGoIdent(ident)))
-				conf.packageDesc.ValidateFunc = gen.QualifiedGoIdent(ident)
+				genConf.packageDesc.ValidateFunc = gen.QualifiedGoIdent(ident)
 				break LOOP
 			}
 		}

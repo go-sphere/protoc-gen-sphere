@@ -9,6 +9,7 @@ import (
 
 type GeneratedFile struct {
 	g       *protogen.GeneratedFile
+	imports []string
 	dummies map[protogen.GoImportPath]protogen.GoIdent
 }
 
@@ -21,13 +22,18 @@ func NewGen(g *protogen.GeneratedFile) *GeneratedFile {
 
 func (g *GeneratedFile) QualifiedGoIdent(id protogen.GoIdent) string {
 	if _, ok := g.dummies[id.GoImportPath]; !ok {
+		g.imports = append(g.imports, string(id.GoImportPath))
 		g.dummies[id.GoImportPath] = id
 	}
 	return g.g.QualifiedGoIdent(id)
 }
 
-func (g *GeneratedFile) Dummies() map[protogen.GoImportPath]protogen.GoIdent {
-	return g.dummies
+func (g *GeneratedFile) Dummies() []protogen.GoIdent {
+	idents := make([]protogen.GoIdent, 0, len(g.dummies))
+	for _, ident := range g.imports {
+		idents = append(idents, g.dummies[protogen.GoImportPath(ident)])
+	}
+	return idents
 }
 
 func ProtoKeyPathToField(message *protogen.Message, keypath []string) *protogen.Field {
