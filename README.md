@@ -277,7 +277,7 @@ The plugin supports the following Google API HTTP annotations:
 
 Fields can be bound to different parts of the HTTP request using sphere binding annotations:
 
-- `BINDING_LOCATION_BODY`: JSON request body (default)
+- `BINDING_LOCATION_JSON`: JSON request body (default)
 - `BINDING_LOCATION_QUERY`: Query parameters
 - `BINDING_LOCATION_URI`: Path parameters
 - `BINDING_LOCATION_HEADER`: HTTP headers
