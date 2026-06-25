@@ -7,85 +7,9 @@ import (
 	"google.golang.org/protobuf/reflect/protoreflect"
 )
 
-type GeneratedFile struct {
-	g       *protogen.GeneratedFile
-	imports []string
-	dummies map[protogen.GoImportPath]protogen.GoIdent
-}
-
-func NewGen(g *protogen.GeneratedFile) *GeneratedFile {
-	return &GeneratedFile{
-		g:       g,
-		dummies: make(map[protogen.GoImportPath]protogen.GoIdent),
-	}
-}
-
-func (g *GeneratedFile) QualifiedGoIdent(id protogen.GoIdent) string {
-	if _, ok := g.dummies[id.GoImportPath]; !ok {
-		g.imports = append(g.imports, string(id.GoImportPath))
-		g.dummies[id.GoImportPath] = id
-	}
-	return g.g.QualifiedGoIdent(id)
-}
-
-func (g *GeneratedFile) Dummies() []protogen.GoIdent {
-	idents := make([]protogen.GoIdent, 0, len(g.dummies))
-	for _, ident := range g.imports {
-		idents = append(idents, g.dummies[protogen.GoImportPath(ident)])
-	}
-	return idents
-}
-
-func ProtoKeyPathToField(message *protogen.Message, keypath []string) *protogen.Field {
-	if len(keypath) == 0 || message == nil {
-		return nil
-	}
-
-	for _, field := range message.Fields {
-		if string(field.Desc.Name()) != keypath[0] {
-			continue
-		}
-
-		if len(keypath) == 1 {
-			return field
-		}
-
-		if field.Message != nil {
-			return ProtoKeyPathToField(field.Message, keypath[1:])
-		}
-
-		if field.Oneof != nil {
-			for _, oneofField := range field.Oneof.Fields {
-				if string(oneofField.Desc.Name()) == keypath[1] {
-					if len(keypath) == 2 {
-						return oneofField
-					}
-					if len(keypath) > 2 && oneofField.Message != nil {
-						return ProtoKeyPathToField(oneofField.Message, keypath[2:])
-					}
-				}
-			}
-		}
-	}
-	return nil
-}
-
-func ProtoKeyPathToGoKeyPath(message *protogen.Message, keypath []string) []string {
-	if len(keypath) == 0 || message == nil {
-		return nil
-	}
-	goKeyPath := make([]string, 0, len(keypath))
-	for _, key := range keypath {
-		field := ProtoKeyPathToField(message, []string{key})
-		if field == nil {
-			return nil
-		}
-		goKeyPath = append(goKeyPath, field.GoName)
-		message = field.Message
-	}
-	return goKeyPath
-}
-
+// ProtoTypeToGoType returns the Go type expression for a proto field, handling
+// maps, repeated fields and scalars. usePtrForMessage controls whether singular
+// message types are rendered as pointers.
 func ProtoTypeToGoType(g *GeneratedFile, field *protogen.Field, usePtrForMessage bool) string {
 	switch {
 	case field.Desc.IsMap():
@@ -164,6 +88,8 @@ func singularProtoTypeToGoType(g *GeneratedFile, field *protogen.Field, usePtrFo
 	}
 }
 
+// ProtoTypeToSwaggerType returns the Swagger type expression for a proto field,
+// handling maps, repeated fields and scalars.
 func ProtoTypeToSwaggerType(g *GeneratedFile, field *protogen.Field) string {
 	switch {
 	case field.Desc.IsMap():

@@ -40,3 +40,7 @@ lint:
 	golangci-lint fmt --no-config --enable gofmt,goimports
 	golangci-lint run --no-config --fix
 	nilaway -include-pkgs="$(MODULE)" ./...
+
+.PHONY: install
+install:
+	go install .

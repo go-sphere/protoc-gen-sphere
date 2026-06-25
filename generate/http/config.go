@@ -4,7 +4,7 @@ import (
 	"errors"
 	"strings"
 
-	"github.com/go-sphere/protoc-gen-sphere/generate/template"
+	"github.com/go-sphere/protoc-gen-sphere/generate/internal/template"
 	"google.golang.org/protobuf/compiler/protogen"
 )
 
@@ -43,7 +43,9 @@ type Config struct {
 	ContextLoadFunc   string
 }
 
-type GenConfig struct {
+// genConfig holds the per-file generation state derived from Config. It is
+// internal to the package and scoped to a single generated file.
+type genConfig struct {
 	omitempty       bool
 	omitemptyPrefix string
 	swaggerAuth     string

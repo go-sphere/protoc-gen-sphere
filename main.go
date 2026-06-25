@@ -5,7 +5,6 @@ import (
 	"fmt"
 
 	"github.com/go-sphere/protoc-gen-sphere/generate/http"
-	"github.com/go-sphere/protoc-gen-sphere/generate/template"
 	"google.golang.org/protobuf/compiler/protogen"
 	"google.golang.org/protobuf/types/pluginpb"
 )
@@ -43,7 +42,7 @@ func main() {
 		if err != nil {
 			return err
 		}
-		err = template.ReplaceTemplateIfNeed(conf.TemplateFile)
+		err = http.ReplaceTemplateIfNeed(conf.TemplateFile)
 		if err != nil {
 			return err
 		}

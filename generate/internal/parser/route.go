@@ -90,11 +90,9 @@ func HTTPRoute(protoPath string) (string, error) {
 
 func HTTPRouteToSwaggerRoute(ginPath string) string {
 	//  :params -> {params}
-	re := regexp.MustCompile(`:([a-zA-Z_][a-zA-Z0-9_]*)`)
-	swaggerPath := re.ReplaceAllString(ginPath, "{$1}")
+	swaggerPath := namedParamRegex.ReplaceAllString(ginPath, "{$1}")
 	//  *filepath -> {filepath}
-	re2 := regexp.MustCompile(`\*([a-zA-Z_][a-zA-Z0-9_]*)`)
-	swaggerPath = re2.ReplaceAllString(swaggerPath, "{$1}")
+	swaggerPath = wildcardParamRegex.ReplaceAllString(swaggerPath, "{$1}")
 	return swaggerPath
 }
 
