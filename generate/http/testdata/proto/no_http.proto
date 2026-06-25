@@ -1,0 +1,19 @@
+syntax = "proto3";
+
+package testdata.nohttp.v1;
+
+option go_package = "github.com/go-sphere/protoc-gen-sphere/generate/http/testdata/gen/nohttpv1;nohttpv1";
+
+// NoHTTPService has methods but no google.api.http annotations. With omitempty
+// it is skipped; with omitempty disabled each method gets a default POST route.
+service NoHTTPService {
+  rpc Ping(PingRequest) returns (PingResponse);
+}
+
+message PingRequest {
+  string msg = 1;
+}
+
+message PingResponse {
+  string msg = 1;
+}

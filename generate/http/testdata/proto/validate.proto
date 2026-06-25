@@ -1,0 +1,26 @@
+syntax = "proto3";
+
+package testdata.validate.v1;
+
+import "buf/validate/validate.proto";
+import "google/api/annotations.proto";
+
+option go_package = "github.com/go-sphere/protoc-gen-sphere/generate/http/testdata/gen/validatev1;validatev1";
+
+service ValidateService {
+  rpc Create(CreateRequest) returns (CreateResponse) {
+    option (google.api.http) = {
+      post: "/api/create"
+      body: "*"
+    };
+  }
+}
+
+message CreateRequest {
+  string name = 1 [(buf.validate.field).required = true];
+  string code = 2 [(buf.validate.field).string = {min_len: 1}];
+}
+
+message CreateResponse {
+  string id = 1;
+}

@@ -1,21 +1,13 @@
 package main
 
 import (
-	"errors"
 	"flag"
 	"fmt"
-	"strings"
 
 	"github.com/go-sphere/protoc-gen-sphere/generate/http"
 	"github.com/go-sphere/protoc-gen-sphere/generate/template"
 	"google.golang.org/protobuf/compiler/protogen"
 	"google.golang.org/protobuf/types/pluginpb"
-)
-
-const (
-	swaggerAuthComment  = "// @Param Authorization header string false \"Bearer token\""
-	defaultHTTPxPackage = "github.com/go-sphere/httpx"
-	defaultHTTPzPackage = "github.com/go-sphere/sphere/server/httpz"
 )
 
 var (
@@ -25,16 +17,16 @@ var (
 	omitemptyPrefix = flag.String("omitempty_prefix", "", "omit if google.api is empty")
 
 	templateFile      = flag.String("template_file", "", "template file, if not set, use default template")
-	swaggerAuthHeader = flag.String("swagger_auth_header", swaggerAuthComment, "swagger auth header")
+	swaggerAuthHeader = flag.String("swagger_auth_header", http.DefaultSwaggerAuthHeader, "swagger auth header")
 
-	routerType      = flag.String("router_type", defaultHTTPxPackage+";Router", "router type")
-	contextType     = flag.String("context_type", defaultHTTPxPackage+";Context", "context type")
-	handlerType     = flag.String("handler_type", defaultHTTPxPackage+";Handler", "handler type")
-	contextLoadFunc = flag.String("context_load_func", ".Context()", "context load func")
+	routerType      = flag.String("router_type", http.DefaultRouterType, "router type")
+	contextType     = flag.String("context_type", http.DefaultContextType, "context type")
+	handlerType     = flag.String("handler_type", http.DefaultHandlerType, "handler type")
+	contextLoadFunc = flag.String("context_load_func", http.DefaultContextLoadFunc, "context load func")
 
-	errorRespType     = flag.String("error_resp_type", defaultHTTPzPackage+";ErrorResponse", "error response type")
-	dataRespType      = flag.String("data_resp_type", defaultHTTPzPackage+";DataResponse", "data response type, must support generic")
-	serverHandlerFunc = flag.String("server_handler_func", defaultHTTPzPackage+";WithJson", "server handler func, must support generic")
+	errorRespType     = flag.String("error_resp_type", http.DefaultErrorRespType, "error response type")
+	dataRespType      = flag.String("data_resp_type", http.DefaultDataRespType, "data response type, must support generic")
+	serverHandlerFunc = flag.String("server_handler_func", http.DefaultServerHandlerFunc, "server handler func, must support generic")
 )
 
 func main() {
@@ -68,40 +60,29 @@ func main() {
 	})
 }
 
-func parseGoIdent(raw string) (protogen.GoIdent, error) {
-	parts := strings.Split(raw, ";")
-	if len(parts) != 2 {
-		return protogen.GoIdent{}, errors.New("invalid GoIdent format, expected 'path;ident'")
-	}
-	return protogen.GoIdent{
-		GoName:       parts[1],
-		GoImportPath: protogen.GoImportPath(parts[0]),
-	}, nil
-}
-
 func extractConfig() (*http.Config, error) {
-	_routerType, err := parseGoIdent(*routerType)
+	_routerType, err := http.ParseGoIdent(*routerType)
 	if err != nil {
 		return nil, err
 	}
-	_contextType, err := parseGoIdent(*contextType)
+	_contextType, err := http.ParseGoIdent(*contextType)
 	if err != nil {
 		return nil, err
 	}
-	_handlerType, err := parseGoIdent(*handlerType)
+	_handlerType, err := http.ParseGoIdent(*handlerType)
 	if err != nil {
 		return nil, err
 	}
-	_errorRespType, err := parseGoIdent(*errorRespType)
+	_errorRespType, err := http.ParseGoIdent(*errorRespType)
 	if err != nil {
 		return nil, err
 	}
-	_dataRespType, err := parseGoIdent(*dataRespType)
+	_dataRespType, err := http.ParseGoIdent(*dataRespType)
 	if err != nil {
 		return nil, err
 	}
 
-	_serverHandlerFunc, err := parseGoIdent(*serverHandlerFunc)
+	_serverHandlerFunc, err := http.ParseGoIdent(*serverHandlerFunc)
 	if err != nil {
 		return nil, err
 	}

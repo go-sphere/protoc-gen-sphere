@@ -1,0 +1,32 @@
+syntax = "proto3";
+
+package testdata.binding.v1;
+
+import "google/api/annotations.proto";
+import "sphere/binding/binding.proto";
+
+option go_package = "github.com/go-sphere/protoc-gen-sphere/generate/http/testdata/gen/bindingv1;bindingv1";
+
+service BindingService {
+  // Mix exercises uri, header and default-location query bindings together.
+  rpc Mix(MixRequest) returns (MixResponse) {
+    option (google.api.http) = {
+      post: "/api/mix/{path_id}"
+      body: "*"
+    };
+  }
+}
+
+message MixRequest {
+  // Fields without an explicit location fall back to QUERY.
+  option (sphere.binding.default_location) = BINDING_LOCATION_QUERY;
+
+  string path_id = 1 [(sphere.binding.location) = BINDING_LOCATION_URI];
+  string header_token = 2 [(sphere.binding.location) = BINDING_LOCATION_HEADER];
+  string q1 = 3;
+  int64 q2 = 4;
+}
+
+message MixResponse {
+  string ok = 1;
+}

@@ -1,0 +1,13 @@
+syntax = "proto3";
+
+package testdata.shared.v1;
+
+option go_package = "github.com/go-sphere/protoc-gen-sphere/generate/http/testdata/gen/sharedv1;sharedv1";
+
+// TestEnum is a shared enum used across fixtures to exercise cross-package
+// type references in generated code.
+enum TestEnum {
+  TEST_ENUM_UNSPECIFIED = 0;
+  TEST_ENUM_VALUE1 = 1;
+  TEST_ENUM_VALUE2 = 2;
+}

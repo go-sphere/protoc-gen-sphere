@@ -36,9 +36,7 @@ var NoBodyMethods = map[string]struct{}{
 func BuildAnnotations(g *GeneratedFile, m *protogen.Method, config *SwagParams) (string, error) {
 	var builder strings.Builder
 	builder.WriteString("// @Summary " + string(m.Desc.Name()) + "\n")
-	desc := strings.TrimSpace(string(m.Comments.Leading))
-	if desc != "" {
-		desc = strings.TrimSpace(strings.Join(strings.Split(desc, "\n"), ","))
+	if desc := swaggerDescription(string(m.Comments.Leading)); desc != "" {
 		builder.WriteString("// @Description " + desc + "\n")
 	}
 
@@ -114,6 +112,17 @@ func buildSwaggerParamTypeByPath(g *GeneratedFile, m *protogen.Method, message *
 		}
 	}
 	return name, nil
+}
+
+// swaggerDescription collapses a method's leading proto comment into a single
+// comma-separated line suitable for a Swagger @Description. Empty input yields
+// an empty string.
+func swaggerDescription(leading string) string {
+	desc := strings.TrimSpace(leading)
+	if desc == "" {
+		return ""
+	}
+	return strings.TrimSpace(strings.Join(strings.Split(desc, "\n"), ","))
 }
 
 func isFieldRequired(field *protogen.Field, defaultRequired bool) bool {

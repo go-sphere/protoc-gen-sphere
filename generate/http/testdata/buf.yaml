@@ -1,0 +1,14 @@
+version: v2
+modules:
+  - path: proto
+deps:
+  - buf.build/googleapis/googleapis
+  - buf.build/go-sphere/binding
+  - buf.build/bufbuild/protovalidate
+lint:
+  use:
+    - STANDARD
+  rpc_allow_same_request_response: true
+breaking:
+  use:
+    - FILE
