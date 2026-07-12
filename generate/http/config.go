@@ -32,6 +32,11 @@ type Config struct {
 	OmitemptyPrefix string
 	SwaggerAuth     string
 	TemplateFile    string
+	// FailOnWarn promotes generation warnings (streaming methods that are
+	// skipped, GET/DELETE requests declaring a body, missing body declarations)
+	// into hard errors so `buf generate` fails instead of silently emitting a
+	// partial result. Defaults to false to preserve existing behavior.
+	FailOnWarn bool
 
 	RouterType    protogen.GoIdent
 	ContextType   protogen.GoIdent
@@ -49,6 +54,7 @@ type genConfig struct {
 	omitempty       bool
 	omitemptyPrefix string
 	swaggerAuth     string
+	failOnWarn      bool
 	packageDesc     *template.PackageDesc
 	// methodSets tracks the per-file duplicate count for each method GoName so
 	// MethodDesc.Num stays deterministic. It is scoped to a single generated file

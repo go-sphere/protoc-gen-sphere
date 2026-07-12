@@ -16,14 +16,19 @@ var _ = (*httpx.Router)(nil)
 var _ = (*httpz.ErrorResponse)(nil)
 
 const OperationBindingServiceMix = "/testdata.binding.v1.BindingService/Mix"
+const OperationBindingServiceUpload = "/testdata.binding.v1.BindingService/Upload"
 
 var EndpointsBindingService = [...][3]string{
 	{OperationBindingServiceMix, "POST", "/api/mix/:path_id"},
+	{OperationBindingServiceUpload, "POST", "/api/upload/:path_id"},
 }
 
 type BindingServiceHTTPServer interface {
 	// Mix Mix exercises uri, header and default-location query bindings together.
 	Mix(context.Context, *MixRequest) (*MixResponse, error)
+	// Upload Upload exercises form binding together with a uri parameter. The request
+	// has no JSON body: the form fields are decoded from the request form data.
+	Upload(context.Context, *UploadRequest) (*UploadResponse, error)
 }
 
 // @Summary Mix
@@ -63,7 +68,37 @@ func _BindingService_Mix0_HTTP_Handler(srv BindingServiceHTTPServer) httpx.Handl
 	})
 }
 
+// @Summary Upload
+// @Description Upload exercises form binding together with a uri parameter. The request, has no JSON body: the form fields are decoded from the request form data.
+// @Tags testdata.binding.v1,testdata.binding.v1.BindingService
+// @Accept json
+// @Produce json
+// @Param Authorization header string false "Bearer token"
+// @Param path_id path string true "path_id"
+// @Param name formData string false "name"
+// @Param size formData integer false "size"
+// @Success 200 {object} httpz.DataResponse[UploadResponse]
+// @Failure 400,401,403,500,default {object} httpz.ErrorResponse
+// @Router /api/upload/{path_id} [post]
+func _BindingService_Upload0_HTTP_Handler(srv BindingServiceHTTPServer) httpx.Handler {
+	return httpz.WithJson(func(ctx httpx.Context) (*UploadResponse, error) {
+		var in UploadRequest
+		if err := ctx.BindForm(&in); err != nil {
+			return nil, err
+		}
+		if err := ctx.BindURI(&in); err != nil {
+			return nil, err
+		}
+		out, err := srv.Upload(ctx.Context(), &in)
+		if err != nil {
+			return nil, err
+		}
+		return out, nil
+	})
+}
+
 func RegisterBindingServiceHTTPServer(route httpx.Router, srv BindingServiceHTTPServer) {
 	r := route.Group("/")
 	r.Handle("POST", "/api/mix/:path_id", _BindingService_Mix0_HTTP_Handler(srv))
+	r.Handle("POST", "/api/upload/:path_id", _BindingService_Upload0_HTTP_Handler(srv))
 }

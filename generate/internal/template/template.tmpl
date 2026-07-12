@@ -44,6 +44,11 @@ func _{{$svrType}}_{{.Name}}{{.Num}}_HTTP_Handler(srv {{$svrType}}HTTPServer) {{
 			return nil, err
 		}
 		{{- end}}
+		{{- if .HasForm}}
+		if err := ctx.BindForm(&in); err != nil {
+			return nil, err
+		}
+		{{- end}}
 		{{- if .HasVars}}
 		if err := ctx.BindURI(&in); err != nil {
 			return nil, err

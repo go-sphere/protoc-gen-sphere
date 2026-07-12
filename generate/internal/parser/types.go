@@ -126,10 +126,42 @@ func singularSwaggerParamType(g *GeneratedFile, field *protogen.Field) string {
 		return "integer"
 	case protoreflect.MessageKind:
 		if field.Message != nil {
+			// Well-known types (Timestamp/Duration/wrapperspb.*Value) have a
+			// canonical scalar JSON representation. Emitting the Go package type
+			// (e.g. timestamppb.Timestamp) would produce a bogus Swagger schema
+			// reference, so map them to their scalar form the way grpc-gateway
+			// does.
+			if swaggerType, ok := wellKnownSwaggerScalar(field); ok {
+				return swaggerType
+			}
 			return g.QualifiedGoIdent(field.Message.GoIdent)
 		}
 		return "any"
 	default:
 		return "any"
 	}
+}
+
+// wellKnownSwaggerScalar maps the well-known message types that carry a natural
+// scalar representation to their Swagger scalar type. It returns ok=false for
+// any other message type. The set mirrors grpc-gateway: Timestamp/Duration are
+// rendered as strings and the wrapperspb.*Value types collapse to their inner
+// scalar.
+func wellKnownSwaggerScalar(field *protogen.Field) (string, bool) {
+	if field.Message == nil {
+		return "", false
+	}
+	switch field.Message.Desc.FullName() {
+	case "google.protobuf.Timestamp", "google.protobuf.Duration",
+		"google.protobuf.StringValue", "google.protobuf.BytesValue":
+		return "string", true
+	case "google.protobuf.BoolValue":
+		return "boolean", true
+	case "google.protobuf.DoubleValue", "google.protobuf.FloatValue":
+		return "number", true
+	case "google.protobuf.Int32Value", "google.protobuf.UInt32Value",
+		"google.protobuf.Int64Value", "google.protobuf.UInt64Value":
+		return "integer", true
+	}
+	return "", false
 }

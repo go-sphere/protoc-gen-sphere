@@ -58,6 +58,7 @@ func generateFileContent(plugin *protogen.Plugin, file *protogen.File, gen *prot
 		omitempty:       conf.Omitempty,
 		omitemptyPrefix: conf.OmitemptyPrefix,
 		swaggerAuth:     conf.SwaggerAuth,
+		failOnWarn:      conf.FailOnWarn,
 		packageDesc:     pkgDesc,
 		methodSets:      make(map[string]int),
 	}

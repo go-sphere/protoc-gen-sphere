@@ -1,0 +1,84 @@
+syntax = "proto3";
+
+package testdata.integration.v1;
+
+import "google/api/annotations.proto";
+import "google/protobuf/duration.proto";
+import "google/protobuf/timestamp.proto";
+import "google/protobuf/wrappers.proto";
+import "sphere/binding/binding.proto";
+
+option go_package = "github.com/go-sphere/protoc-gen-sphere/generate/http/testdata/gen/integrationv1;integrationv1";
+
+// IntegrationService bundles every binding shape that historically only broke
+// when the plugins were combined: a nested message + map + oneof carried in the
+// JSON body, a multipart form upload, well-known types used as query params, a
+// uri param and a header param. It is the fixture behind the cross-plugin
+// integration test.
+service IntegrationService {
+  // CreateItem carries the whole request as JSON while pulling tenant_id from
+  // the path, request_id from a header and not_before from the query string.
+  rpc CreateItem(CreateItemRequest) returns (ItemResponse) {
+    option (google.api.http) = {
+      post: "/api/tenants/{tenant_id}/items"
+      body: "*"
+    };
+  }
+  // UploadItem decodes its payload from multipart form data (no JSON body).
+  rpc UploadItem(UploadItemRequest) returns (ItemResponse) {
+    option (google.api.http) = {post: "/api/tenants/{tenant_id}/items/upload"};
+  }
+  // ListItems exercises well-known types (Timestamp/Duration/wrappers) bound as
+  // query parameters, which must render as scalar Swagger types.
+  rpc ListItems(ListItemsRequest) returns (ListItemsResponse) {
+    option (google.api.http) = {get: "/api/tenants/{tenant_id}/items"};
+  }
+}
+
+// Item mixes a map and a oneof inside the JSON body. Neither is bound to a
+// query/uri/header location, so both are valid.
+message Item {
+  string name = 1;
+  int64 value = 2;
+  map<string, string> labels = 3;
+  oneof kind {
+    string text = 4;
+    int64 number = 5;
+  }
+}
+
+message CreateItemRequest {
+  string tenant_id = 1 [(sphere.binding.location) = BINDING_LOCATION_URI];
+  string request_id = 2 [(sphere.binding.location) = BINDING_LOCATION_HEADER];
+  google.protobuf.Timestamp not_before = 3 [(sphere.binding.location) = BINDING_LOCATION_QUERY];
+  Item item = 4;
+}
+
+message UploadItemRequest {
+  // Fields without an explicit location fall back to FORM.
+  option (sphere.binding.default_location) = BINDING_LOCATION_FORM;
+
+  string tenant_id = 1 [(sphere.binding.location) = BINDING_LOCATION_URI];
+  string filename = 2;
+  int64 size = 3;
+}
+
+message ListItemsRequest {
+  // Fields without an explicit location fall back to QUERY.
+  option (sphere.binding.default_location) = BINDING_LOCATION_QUERY;
+
+  string tenant_id = 1 [(sphere.binding.location) = BINDING_LOCATION_URI];
+  google.protobuf.Timestamp created_after = 2;
+  google.protobuf.Duration max_age = 3;
+  google.protobuf.StringValue keyword = 4;
+  google.protobuf.Int64Value limit = 5;
+  google.protobuf.BoolValue active = 6;
+}
+
+message ItemResponse {
+  Item item = 1;
+}
+
+message ListItemsResponse {
+  repeated Item items = 1;
+}

@@ -15,6 +15,11 @@ service BindingService {
       body: "*"
     };
   }
+  // Upload exercises form binding together with a uri parameter. The request
+  // has no JSON body: the form fields are decoded from the request form data.
+  rpc Upload(UploadRequest) returns (UploadResponse) {
+    option (google.api.http) = {post: "/api/upload/{path_id}"};
+  }
 }
 
 message MixRequest {
@@ -28,5 +33,18 @@ message MixRequest {
 }
 
 message MixResponse {
+  string ok = 1;
+}
+
+message UploadRequest {
+  // Fields without an explicit location fall back to FORM.
+  option (sphere.binding.default_location) = BINDING_LOCATION_FORM;
+
+  string path_id = 1 [(sphere.binding.location) = BINDING_LOCATION_URI];
+  string name = 2;
+  int64 size = 3;
+}
+
+message UploadResponse {
   string ok = 1;
 }

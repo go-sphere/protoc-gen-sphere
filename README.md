@@ -17,22 +17,28 @@ go install github.com/go-sphere/protoc-gen-sphere@latest
 
 ## Flags
 
-The behavior of `protoc-gen-sphere` can be customized with the following parameters:
+The behavior of `protoc-gen-sphere` can be customized with the following parameters. Type flags use the
+`import/path;Identifier` format.
 
-- **`version`**: Print the current plugin version and exit. (Default: `false`)
-- **`omitempty`**: Omit file generation if `google.api.http` options are not found. (Default: `true`)
-- **`omitempty_prefix`**: A file path prefix. If set, `omitempty` will only apply to files with this prefix. (Default: `""`)
-- **`template_file`**: Path to a custom Go template file. If not provided, the default internal template is used.
-- **`swagger_auth_header`**: The comment for the authorization header in generated Swagger documentation. (Default: `// @Param Authorization header string false "Bearer token"`)
-- **`router_type`**: The fully qualified Go type for the router (e.g., `github.com/gin-gonic/gin;IRouter`). (Default: `github.com/gin-gonic/gin;IRouter`)
-- **`context_type`**: The fully qualified Go type for the request context (e.g., `github.com/gin-gonic/gin;Context`). (Default: `github.com/gin-gonic/gin;Context`)
-- **`data_resp_type`**: The fully qualified Go type for the data response model, which must support generics. (Default: `github.com/go-sphere/sphere/server/ginx;DataResponse`)
-- **`error_resp_type`**: The fully qualified Go type for the error response model. (Default: `github.com/go-sphere/sphere/server/ginx;ErrorResponse`)
-- **`server_handler_func`**: The wrapper function for handling server responses. (Default: `github.com/go-sphere/sphere/server/ginx;WithJson`)
-- **`parse_header_func`**: The function used to parse header parameters. (Default: `github.com/go-sphere/sphere/server/ginx;ShouldBindHeader`)
-- **`parse_json_func`**: The function used to parse JSON request bodies. (Default: `github.com/go-sphere/sphere/server/ginx;ShouldBindJSON`)
-- **`parse_uri_func`**: The function used to parse URI parameters. (Default: `github.com/go-sphere/sphere/server/ginx;ShouldBindUri`)
-- **`parse_form_func`**: The function used to parse form data/query parameters. (Default: `github.com/go-sphere/sphere/server/ginx;ShouldBindQuery`)
+| Flag                  | Description                                                                                                             | Default                                                     |
+|-----------------------|-----------------------------------------------------------------------------------------------------------------------|-------------------------------------------------------------|
+| `version`             | Print the current plugin version and exit.                                                                            | `false`                                                     |
+| `omitempty`           | Omit file generation for files whose methods have no `google.api.http` option.                                        | `true`                                                      |
+| `omitempty_prefix`    | A file path prefix. When set, `omitempty` only applies to files with this prefix.                                     | `""`                                                        |
+| `fail_on_warn`        | Treat generation warnings (skipped streaming methods, GET/DELETE declaring a body, missing body) as hard errors.     | `false`                                                     |
+| `template_file`       | Path to a custom Go template file. When empty the embedded default template is used.                                 | `""`                                                        |
+| `swagger_auth_header` | The comment injected as the authorization header in generated Swagger documentation.                                 | `// @Param Authorization header string false "Bearer token"` |
+| `router_type`         | Fully qualified Go type for the router.                                                                               | `github.com/go-sphere/httpx;Router`                         |
+| `context_type`        | Fully qualified Go type for the request context.                                                                     | `github.com/go-sphere/httpx;Context`                        |
+| `handler_type`        | Fully qualified Go type returned by each generated handler.                                                          | `github.com/go-sphere/httpx;Handler`                        |
+| `context_load_func`   | Expression appended to the context value to obtain a `context.Context` (e.g. `ctx.Context()`).                       | `.Context()`                                                |
+| `data_resp_type`      | Fully qualified Go type for the data response model; must support generics.                                          | `github.com/go-sphere/sphere/server/httpz;DataResponse`     |
+| `error_resp_type`     | Fully qualified Go type for the error response model.                                                                | `github.com/go-sphere/sphere/server/httpz;ErrorResponse`    |
+| `server_handler_func` | Wrapper function that adapts the generated handler to the response model; must support generics.                    | `github.com/go-sphere/sphere/server/httpz;WithJson`         |
+
+> Request binding no longer uses standalone `parse_*_func` flags. Binding is performed through methods on the
+> configured `context_type` (`BindJSON` / `BindQuery` / `BindURI` / `BindHeader` / `BindForm`), so customizing the
+> binding behavior is done via `context_type`.
 
 
 ## Usage with Buf
@@ -143,25 +149,25 @@ The plugin generates Go code with HTTP handlers, route registration, and Swagger
 // @Param query_test1 query string true "query_test1"
 // @Param query_test2 query integer false "query_test2"
 // @Param request body RunTestRequest true "request body"
-// @Success 200 {object} ginx.DataResponse[RunTestResponse]
-// @Failure 400,401,403,500,default {object} ginx.ErrorResponse
+// @Success 200 {object} httpz.DataResponse[RunTestResponse]
+// @Failure 400,401,403,500,default {object} httpz.ErrorResponse
 // @Router /api/test/{path_test1}/second/{path_test2} [post]
-func _TestService_RunTest0_HTTP_Handler(srv TestServiceHTTPServer) func(ctx *gin.Context) {
-    return ginx.WithJson(func(ctx *gin.Context) (*RunTestResponse, error) {
+func _TestService_RunTest0_HTTP_Handler(srv TestServiceHTTPServer) httpx.Handler {
+    return httpz.WithJson(func(ctx httpx.Context) (*RunTestResponse, error) {
         var in RunTestRequest
-        if err := ginx.ShouldBindJSON(ctx, &in); err != nil {
+        if err := ctx.BindJSON(&in); err != nil {
             return nil, err
         }
-        if err := ginx.ShouldBindQuery(ctx, &in); err != nil {
+        if err := ctx.BindQuery(&in); err != nil {
             return nil, err
         }
-        if err := ginx.ShouldBindUri(ctx, &in); err != nil {
+        if err := ctx.BindURI(&in); err != nil {
             return nil, err
         }
         if err := protovalidate.Validate(&in); err != nil {
             return nil, err
         }
-        out, err := srv.RunTest(ctx, &in)
+        out, err := srv.RunTest(ctx.Context(), &in)
         if err != nil {
             return nil, err
         }
@@ -185,10 +191,10 @@ type TestServiceHTTPServer interface {
 ### Route Registration
 
 ```go
-func RegisterTestServiceHTTPServer(route gin.IRouter, srv TestServiceHTTPServer) {
+func RegisterTestServiceHTTPServer(route httpx.Router, srv TestServiceHTTPServer) {
     r := route.Group("/")
-    r.POST("/api/test/:path_test1/second/:path_test2", _TestService_RunTest0_HTTP_Handler(srv))
-    r.POST("/api/test/body_path_test", _TestService_BodyPathTest0_HTTP_Handler(srv))
+    r.Handle("POST", "/api/test/:path_test1/second/:path_test2", _TestService_RunTest0_HTTP_Handler(srv))
+    r.Handle("POST", "/api/test/body_path_test", _TestService_BodyPathTest0_HTTP_Handler(srv))
 }
 ```
 
@@ -240,14 +246,18 @@ func (s *testService) BodyPathTest(ctx context.Context, req *sharedv1.BodyPathTe
 
 ### Registering Routes
 
+The generated `Register...HTTPServer` accepts an `httpx.Router`. Any `httpx.Engine` implementation works; the example
+below uses the Gin-backed engine (`github.com/go-sphere/httpx/ginx`). Swap it for `echox`, `fiberx` or `hertzx` to
+target another framework.
+
 ```go
 func main() {
-    r := gin.New()
-    
+    engine := ginx.New()
+
     srv := &testService{}
-    sharedv1.RegisterTestServiceHTTPServer(r, srv)
-    
-    r.Run(":8080")
+    sharedv1.RegisterTestServiceHTTPServer(engine.Group("/"), srv)
+
+    _ = engine.Start()
 }
 ```
 
@@ -281,6 +291,12 @@ Fields can be bound to different parts of the HTTP request using sphere binding 
 - `BINDING_LOCATION_QUERY`: Query parameters
 - `BINDING_LOCATION_URI`: Path parameters
 - `BINDING_LOCATION_HEADER`: HTTP headers
+- `BINDING_LOCATION_FORM`: Form / multipart form data
+
+> `QUERY`, `URI` and `HEADER` bind a value from a single string token, so only scalar fields (and the well-known scalar
+> wrappers `Timestamp`, `Duration` and `wrapperspb.*Value`) may use them. Marking a `map`, `bytes` or arbitrary
+> `message` field with one of these locations is a generation-time error. Use `JSON` (or `FORM` for `bytes`/files)
+> instead.
 
 ### Optional Fields
 

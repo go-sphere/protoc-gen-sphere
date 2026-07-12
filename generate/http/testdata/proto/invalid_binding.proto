@@ -1,0 +1,52 @@
+syntax = "proto3";
+
+package testdata.invalid.v1;
+
+import "google/api/annotations.proto";
+import "sphere/binding/binding.proto";
+
+option go_package = "github.com/go-sphere/protoc-gen-sphere/generate/http/testdata/gen/invalidv1;invalidv1";
+
+// InvalidService collects requests whose fields are bound to a location that
+// cannot decode them (map / message / bytes bound to QUERY / URI / HEADER). The
+// plugin must reject these at generation time instead of emitting an unusable
+// binding. Each method is exercised individually by the validation test; the
+// file as a whole is never turned into a golden fixture.
+service InvalidService {
+  rpc QueryMessage(QueryMessageRequest) returns (Empty) {
+    option (google.api.http) = {
+      post: "/api/q"
+      body: "*"
+    };
+  }
+  rpc UriMessage(UriMessageRequest) returns (Empty) {
+    option (google.api.http) = {get: "/api/u/{inner}"};
+  }
+  rpc HeaderMap(HeaderMapRequest) returns (Empty) {
+    option (google.api.http) = {
+      post: "/api/h"
+      body: "*"
+    };
+  }
+}
+
+message Inner {
+  string a = 1;
+}
+
+message Empty {}
+
+// A message-typed field cannot be bound from a query token.
+message QueryMessageRequest {
+  Inner inner = 1 [(sphere.binding.location) = BINDING_LOCATION_QUERY];
+}
+
+// A message-typed field cannot be bound from a uri token.
+message UriMessageRequest {
+  Inner inner = 1 [(sphere.binding.location) = BINDING_LOCATION_URI];
+}
+
+// A map field cannot be bound from a header token.
+message HeaderMapRequest {
+  map<string, string> data = 1 [(sphere.binding.location) = BINDING_LOCATION_HEADER];
+}

@@ -6,6 +6,7 @@ import (
 	bindingpb "github.com/go-sphere/binding/sphere/binding"
 	"google.golang.org/protobuf/compiler/protogen"
 	"google.golang.org/protobuf/proto"
+	"google.golang.org/protobuf/reflect/protoreflect"
 )
 
 type ParamsField struct {
@@ -19,6 +20,9 @@ func HeaderParams(m *protogen.Method) ([]ParamsField, error) {
 	for _, field := range m.Input.Fields {
 		name := string(field.Desc.Name())
 		if checkBindingLocation(m.Input, field, bindingpb.BindingLocation_BINDING_LOCATION_HEADER) {
+			if err := checkScalarBindable(m, field, "HEADER"); err != nil {
+				return nil, err
+			}
 			fields = append(fields, ParamsField{
 				Name:  name,
 				Field: field,
@@ -52,6 +56,9 @@ func URIParams(m *protogen.Method, route string) ([]ParamsField, error) {
 		wildcard, exist := params[name]
 		if exist {
 			if checkBindingLocation(m.Input, field, bindingpb.BindingLocation_BINDING_LOCATION_URI) {
+				if err := checkScalarBindable(m, field, "URI"); err != nil {
+					return nil, err
+				}
 				fields = append(fields, ParamsField{
 					Name:     name,
 					Wildcard: wildcard,
@@ -84,6 +91,9 @@ func QueryParams(m *protogen.Method, method string, pathVars []ParamsField) ([]P
 			continue
 		}
 		if checkBindingLocation(m.Input, field, bindingpb.BindingLocation_BINDING_LOCATION_QUERY) {
+			if err := checkScalarBindable(m, field, "QUERY"); err != nil {
+				return nil, err
+			}
 			fields = append(fields, ParamsField{
 				Name:  name,
 				Field: field,
@@ -101,6 +111,74 @@ func QueryParams(m *protogen.Method, method string, pathVars []ParamsField) ([]P
 		}
 	}
 	return fields, nil
+}
+
+func FormParams(m *protogen.Method) ([]ParamsField, error) {
+	var fields []ParamsField
+	for _, field := range m.Input.Fields {
+		name := string(field.Desc.Name())
+		if checkBindingLocation(m.Input, field, bindingpb.BindingLocation_BINDING_LOCATION_FORM) {
+			fields = append(fields, ParamsField{
+				Name:  name,
+				Field: field,
+			})
+		}
+	}
+	return fields, nil
+}
+
+// checkScalarBindable returns a descriptive error when field cannot be bound
+// from a single QUERY/URI/HEADER token. Maps, bytes and arbitrary messages have
+// no scalar text form, so binding them silently produces a tag the runtime
+// cannot decode; failing at generation time surfaces the mistake early. Scalar
+// kinds and well-known scalar wrappers (Timestamp/Duration/wrapperspb.*Value)
+// are allowed through.
+func checkScalarBindable(m *protogen.Method, field *protogen.Field, location string) error {
+	if isScalarBindable(field) {
+		return nil
+	}
+	return fmt.Errorf("method `%s.%s` field `%s` of type `%s` cannot be bound to %s: only scalar types (and well-known scalar wrappers) are supported there. File: `%s`, Message: `%s`",
+		m.Parent.Desc.Name(),
+		m.Desc.Name(),
+		field.Desc.Name(),
+		fieldKindDesc(field),
+		location,
+		m.Parent.Location.SourceFile,
+		m.Input.Desc.Name(),
+	)
+}
+
+// isScalarBindable reports whether field can be bound from a single string token
+// (query/uri/header). Maps and bytes cannot; message fields are only allowed
+// when they are well-known scalar wrappers.
+func isScalarBindable(field *protogen.Field) bool {
+	if field.Desc.IsMap() {
+		return false
+	}
+	switch field.Desc.Kind() {
+	case protoreflect.BytesKind:
+		return false
+	case protoreflect.MessageKind, protoreflect.GroupKind:
+		_, ok := wellKnownSwaggerScalar(field)
+		return ok
+	default:
+		return true
+	}
+}
+
+// fieldKindDesc returns a human-readable description of a field's type for use
+// in error messages (e.g. "map", "bytes", "message").
+func fieldKindDesc(field *protogen.Field) string {
+	switch {
+	case field.Desc.IsMap():
+		return "map"
+	case field.Desc.Kind() == protoreflect.BytesKind:
+		return "bytes"
+	case field.Desc.Kind() == protoreflect.MessageKind || field.Desc.Kind() == protoreflect.GroupKind:
+		return "message"
+	default:
+		return field.Desc.Kind().String()
+	}
 }
 
 func checkBindingLocation(message *protogen.Message, field *protogen.Field, location bindingpb.BindingLocation) bool {

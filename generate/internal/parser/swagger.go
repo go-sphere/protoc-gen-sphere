@@ -17,6 +17,7 @@ type SwagParams struct {
 
 	PathVars   []ParamsField
 	QueryVars  []ParamsField
+	FormVars   []ParamsField
 	HeaderVars []ParamsField
 
 	Body         string
@@ -73,8 +74,17 @@ func BuildAnnotations(g *GeneratedFile, m *protogen.Method, config *SwagParams) 
 		required := isFieldRequired(param.Field, false)
 		_, _ = fmt.Fprintf(&builder, "// @Param %s query %s %v \"%s\"\n", param.Name, paramType, required, param.Name)
 	}
-	// Add a request body
-	if _, ok := NoBodyMethods[config.Method]; !ok {
+	// Add form parameters
+	for _, param := range config.FormVars {
+		paramType := ProtoTypeToSwaggerType(g, param.Field)
+		required := isFieldRequired(param.Field, false)
+		_, _ = fmt.Fprintf(&builder, "// @Param %s formData %s %v \"%s\"\n", param.Name, paramType, required, param.Name)
+	}
+	// Add a request body. Skip it when the request carries form parameters:
+	// in OpenAPI 2.0 `body` and `formData` parameters are mutually exclusive,
+	// and a form-bound request has no JSON body to decode.
+	_, noBody := NoBodyMethods[config.Method]
+	if !noBody && len(config.FormVars) == 0 {
 		bodyType, err := buildSwaggerParamTypeByPath(g, m, m.Input, config.Body)
 		if err != nil {
 			return "", err

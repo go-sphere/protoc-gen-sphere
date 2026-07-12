@@ -48,6 +48,7 @@ type MethodDesc struct {
 
 	HasVars      bool
 	HasQuery     bool
+	HasForm      bool
 	HasBody      bool
 	HasHeader    bool
 	NeedValidate bool
@@ -66,11 +67,7 @@ type PackageDesc struct {
 	ErrorResponseType string
 	DataResponseType  string
 
-	ParseHeaderFunc string
-	ParseJsonFunc   string
-	ParseUriFunc    string
-	ParseFormFunc   string
-	ValidateFunc    string
+	ValidateFunc string
 
 	ServerHandlerWrapperFunc string
 	ContextLoadFunc          string

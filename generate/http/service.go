@@ -25,11 +25,13 @@ func buildServiceDesc(gen *parser.GeneratedFile, service *protogen.Service, conf
 	}
 	for _, method := range service.Methods {
 		if method.Desc.IsStreamingClient() || method.Desc.IsStreamingServer() {
-			logWarn("method `%s.%s` is streaming, it will be ignored. File: `%s`",
+			if err := conf.warn("method `%s.%s` is streaming, it will be ignored. File: `%s`",
 				method.Parent.Desc.Name(),
 				method.Desc.Name(),
 				method.Parent.Location.SourceFile,
-			)
+			); err != nil {
+				return nil, err
+			}
 			continue
 		}
 		rule, ok := proto.GetExtension(method.Desc.Options(), annotations.E_Http).(*annotations.HttpRule)
@@ -75,11 +77,13 @@ func buildHTTPRule(gen *parser.GeneratedFile, service *protogen.Service, m *prot
 	}
 	if _, ok := parser.NoBodyMethods[res.Method]; ok {
 		if rule.Body != "" {
-			logWarn("method `%s.%s` body should not be declared. File: `%s`",
+			if err := conf.warn("method `%s.%s` body should not be declared. File: `%s`",
 				m.Parent.Desc.Name(),
 				m.Desc.Name(),
 				m.Parent.Location.SourceFile,
-			)
+			); err != nil {
+				return nil, err
+			}
 		}
 		// GET/HEAD/DELETE/OPTIONS have no request body: even if a body was
 		// declared, force it off so the generated handler does not emit an
@@ -87,11 +91,13 @@ func buildHTTPRule(gen *parser.GeneratedFile, service *protogen.Service, m *prot
 		res.HasBody = false
 		res.Body = ""
 	} else if rule.Body == "" {
-		logWarn("method `%s.%s` body is not declared. File: `%s`",
+		if err := conf.warn("method `%s.%s` body is not declared. File: `%s`",
 			m.Parent.Desc.Name(),
 			m.Desc.Name(),
 			m.Parent.Location.SourceFile,
-		)
+		); err != nil {
+			return nil, err
+		}
 	}
 	md, err := buildMethodDesc(gen, m, res, conf)
 	if err != nil {
@@ -121,7 +127,12 @@ func buildMethodDesc(gen *parser.GeneratedFile, method *protogen.Method, rule *p
 		return nil, err
 	}
 
-	forms, err := parser.QueryParams(method, rule.Method, vars)
+	queries, err := parser.QueryParams(method, rule.Method, vars)
+	if err != nil {
+		return nil, err
+	}
+
+	forms, err := parser.FormParams(method)
 	if err != nil {
 		return nil, err
 	}
@@ -136,7 +147,8 @@ func buildMethodDesc(gen *parser.GeneratedFile, method *protogen.Method, rule *p
 		Path:          parser.HTTPRouteToSwaggerRoute(route),
 		Auth:          conf.swaggerAuth,
 		PathVars:      vars,
-		QueryVars:     forms,
+		QueryVars:     queries,
+		FormVars:      forms,
 		HeaderVars:    headers,
 		Body:          rule.Body,
 		ResponseBody:  rule.ResponseBody,
@@ -184,7 +196,8 @@ func buildMethodDesc(gen *parser.GeneratedFile, method *protogen.Method, rule *p
 		Method: rule.Method,
 
 		HasVars:      len(vars) > 0,
-		HasQuery:     len(forms) > 0,
+		HasQuery:     len(queries) > 0,
+		HasForm:      len(forms) > 0,
 		HasBody:      rule.HasBody,
 		HasHeader:    len(headers) > 0,
 		NeedValidate: needValidate,
@@ -198,6 +211,17 @@ func buildMethodDesc(gen *parser.GeneratedFile, method *protogen.Method, rule *p
 
 func buildMethodCommend(method *protogen.Method) string {
 	return formatMethodComment(string(method.Desc.Name()), string(method.Comments.Leading))
+}
+
+// warn reports a generation warning. When failOnWarn is enabled the warning is
+// promoted to a hard error so the caller (buf generate) fails; otherwise it is
+// printed to stderr and generation continues with the pre-existing behavior.
+func (c *genConfig) warn(format string, args ...any) error {
+	if c.failOnWarn {
+		return fmt.Errorf(format, args...)
+	}
+	logWarn(format, args...)
+	return nil
 }
 
 func logWarn(format string, args ...any) {

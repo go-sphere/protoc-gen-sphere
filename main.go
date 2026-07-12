@@ -14,6 +14,7 @@ var (
 
 	omitempty       = flag.Bool("omitempty", true, "omit if google.api is empty")
 	omitemptyPrefix = flag.String("omitempty_prefix", "", "omit if google.api is empty")
+	failOnWarn      = flag.Bool("fail_on_warn", false, "treat generation warnings (streaming skips, GET/DELETE body, missing body) as hard errors")
 
 	templateFile      = flag.String("template_file", "", "template file, if not set, use default template")
 	swaggerAuthHeader = flag.String("swagger_auth_header", http.DefaultSwaggerAuthHeader, "swagger auth header")
@@ -89,6 +90,7 @@ func extractConfig() (*http.Config, error) {
 	conf := &http.Config{
 		Omitempty:       *omitempty,
 		OmitemptyPrefix: *omitemptyPrefix,
+		FailOnWarn:      *failOnWarn,
 
 		SwaggerAuth:  *swaggerAuthHeader,
 		TemplateFile: *templateFile,
