@@ -73,10 +73,6 @@ func buildHTTPRule(gen *parser.GeneratedFile, service *protogen.Service, m *prot
 	if res.Path == "" {
 		res.Path = defaultHTTPPath(conf.omitemptyPrefix, string(service.Desc.FullName()), string(m.Desc.Name()))
 	}
-	md, err := buildMethodDesc(gen, m, res, conf)
-	if err != nil {
-		return nil, err
-	}
 	if _, ok := parser.NoBodyMethods[res.Method]; ok {
 		if rule.Body != "" {
 			logWarn("method `%s.%s` body should not be declared. File: `%s`",
@@ -85,14 +81,21 @@ func buildHTTPRule(gen *parser.GeneratedFile, service *protogen.Service, m *prot
 				m.Parent.Location.SourceFile,
 			)
 		}
-	} else {
-		if rule.Body == "" {
-			logWarn("method `%s.%s` body is not declared. File: `%s`",
-				m.Parent.Desc.Name(),
-				m.Desc.Name(),
-				m.Parent.Location.SourceFile,
-			)
-		}
+		// GET/HEAD/DELETE/OPTIONS have no request body: even if a body was
+		// declared, force it off so the generated handler does not emit an
+		// unusable ctx.BindJSON call.
+		res.HasBody = false
+		res.Body = ""
+	} else if rule.Body == "" {
+		logWarn("method `%s.%s` body is not declared. File: `%s`",
+			m.Parent.Desc.Name(),
+			m.Desc.Name(),
+			m.Parent.Location.SourceFile,
+		)
+	}
+	md, err := buildMethodDesc(gen, m, res, conf)
+	if err != nil {
+		return nil, err
 	}
 	return md, nil
 }

@@ -53,6 +53,13 @@ func goldenCases() []goldenCase {
 			goldenFile: "testdata/golden/validate.sphere.pb.go",
 		},
 		{
+			name:       "no_body",
+			pbFile:     "testdata/pb/no_body.pb",
+			protoName:  "no_body.proto",
+			wantFile:   true,
+			goldenFile: "testdata/golden/no_body.sphere.pb.go",
+		},
+		{
 			name:      "no_http",
 			pbFile:    "testdata/pb/no_http.pb",
 			protoName: "no_http.proto",
