@@ -18,13 +18,16 @@ var _ = (*httpz.ErrorResponse)(nil)
 var _ = protovalidate.Validate
 
 const OperationValidateServiceCreate = "/testdata.validate.v1.ValidateService/Create"
+const OperationValidateServiceNestedCreate = "/testdata.validate.v1.ValidateService/NestedCreate"
 
 var EndpointsValidateService = [...][3]string{
 	{OperationValidateServiceCreate, "POST", "/api/create"},
+	{OperationValidateServiceNestedCreate, "POST", "/api/nested"},
 }
 
 type ValidateServiceHTTPServer interface {
 	Create(context.Context, *CreateRequest) (*CreateResponse, error)
+	NestedCreate(context.Context, *NestedCreateRequest) (*CreateResponse, error)
 }
 
 // @Summary Create
@@ -53,7 +56,34 @@ func _ValidateService_Create0_HTTP_Handler(srv ValidateServiceHTTPServer) httpx.
 	})
 }
 
+// @Summary NestedCreate
+// @Tags testdata.validate.v1,testdata.validate.v1.ValidateService
+// @Accept json
+// @Produce json
+// @Param Authorization header string false "Bearer token"
+// @Param request body NestedCreateRequest true "request body"
+// @Success 200 {object} httpz.DataResponse[CreateResponse]
+// @Failure 400,401,403,500,default {object} httpz.ErrorResponse
+// @Router /api/nested [post]
+func _ValidateService_NestedCreate0_HTTP_Handler(srv ValidateServiceHTTPServer) httpx.Handler {
+	return httpz.WithJson(func(ctx httpx.Context) (*CreateResponse, error) {
+		var in NestedCreateRequest
+		if err := ctx.BindJSON(&in); err != nil {
+			return nil, err
+		}
+		if err := protovalidate.Validate(&in); err != nil {
+			return nil, err
+		}
+		out, err := srv.NestedCreate(ctx.Context(), &in)
+		if err != nil {
+			return nil, err
+		}
+		return out, nil
+	})
+}
+
 func RegisterValidateServiceHTTPServer(route httpx.Router, srv ValidateServiceHTTPServer) {
 	r := route.Group("/")
 	r.Handle("POST", "/api/create", _ValidateService_Create0_HTTP_Handler(srv))
+	r.Handle("POST", "/api/nested", _ValidateService_NestedCreate0_HTTP_Handler(srv))
 }

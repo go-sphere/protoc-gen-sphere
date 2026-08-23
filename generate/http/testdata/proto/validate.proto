@@ -14,11 +14,25 @@ service ValidateService {
       body: "*"
     };
   }
+  rpc NestedCreate(NestedCreateRequest) returns (CreateResponse) {
+    option (google.api.http) = {
+      post: "/api/nested"
+      body: "*"
+    };
+  }
 }
 
 message CreateRequest {
   string name = 1 [(buf.validate.field).required = true];
   string code = 2 [(buf.validate.field).string = {min_len: 1}];
+}
+
+message NestedCreateRequest {
+  NestedUser user = 1;
+}
+
+message NestedUser {
+  string email = 1 [(buf.validate.field).required = true];
 }
 
 message CreateResponse {

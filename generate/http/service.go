@@ -4,7 +4,6 @@ import (
 	"fmt"
 	"net/http"
 	"os"
-	"slices"
 	"strings"
 
 	"github.com/go-sphere/protoc-gen-sphere/generate/internal/parser"
@@ -120,7 +119,7 @@ func buildMethodDesc(gen *parser.GeneratedFile, method *protogen.Method, rule *p
 	defer func() { conf.methodSets[method.GoName]++ }()
 
 	comment := buildMethodCommend(method)
-	needValidate := hasValidateOptionsInMessage(method.Input) || slices.ContainsFunc(method.Input.Fields, hasValidateOptions)
+	needValidate := requestNeedsValidate(method.Input)
 
 	vars, err := parser.URIParams(method, route)
 	if err != nil {

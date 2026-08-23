@@ -23,11 +23,18 @@ func HTTPRoute(protoPath string) (string, error) {
 	if protoPath == "" {
 		return "", fmt.Errorf("proto path cannot be empty")
 	}
+	var nestedName string
+	noteNested := func(name string) {
+		if nestedName == "" && strings.Contains(name, ".") {
+			nestedName = name
+		}
+	}
 	result := protoPath
 	// 1.  {param=literal/*} or {param=literal/**}
 	result = complexLiteralRegex.ReplaceAllStringFunc(result, func(match string) string {
 		matches := complexLiteralRegex.FindStringSubmatch(match)
 		if len(matches) >= 4 {
+			noteNested(matches[1])
 			paramName := cleanParamName(matches[1])
 			literalPart := matches[2]
 			wildcardPart := matches[3]
@@ -54,6 +61,7 @@ func HTTPRoute(protoPath string) (string, error) {
 	result = doubleWildcardRegex.ReplaceAllStringFunc(result, func(match string) string {
 		matches := doubleWildcardRegex.FindStringSubmatch(match)
 		if len(matches) >= 2 {
+			noteNested(matches[1])
 			paramName := cleanParamName(matches[1])
 			return "/*" + paramName
 		}
@@ -63,6 +71,7 @@ func HTTPRoute(protoPath string) (string, error) {
 	result = singleWildcardRegex.ReplaceAllStringFunc(result, func(match string) string {
 		matches := singleWildcardRegex.FindStringSubmatch(match)
 		if len(matches) >= 2 {
+			noteNested(matches[1])
 			paramName := cleanParamName(matches[1])
 			return "/:" + paramName
 		}
@@ -72,11 +81,15 @@ func HTTPRoute(protoPath string) (string, error) {
 	result = simpleParamRegex.ReplaceAllStringFunc(result, func(match string) string {
 		matches := simpleParamRegex.FindStringSubmatch(match)
 		if len(matches) >= 2 {
+			noteNested(matches[1])
 			paramName := cleanParamName(matches[1])
 			return "/:" + paramName
 		}
 		return match
 	})
+	if nestedName != "" {
+		return "", fmt.Errorf("nested path variables such as {%s} are not supported; declare a top-level field and mark it BINDING_LOCATION_URI", nestedName)
+	}
 	result = multipleSlashRegex.ReplaceAllString(result, "/")
 	if !strings.HasPrefix(result, "/") {
 		result = "/" + result

@@ -38,6 +38,7 @@ type NoBodyServiceHTTPServer interface {
 // @Accept json
 // @Produce json
 // @Param Authorization header string false "Bearer token"
+// @Param auth_token header string false "auth_token"
 // @Param id path integer true "id"
 // @Param filter query string false "filter"
 // @Success 200 {object} httpz.DataResponse[GetItemResponse]
@@ -46,6 +47,9 @@ type NoBodyServiceHTTPServer interface {
 func _NoBodyService_GetItem0_HTTP_Handler(srv NoBodyServiceHTTPServer) httpx.Handler {
 	return httpz.WithJson(func(ctx httpx.Context) (*GetItemResponse, error) {
 		var in GetItemRequest
+		if err := ctx.BindHeader(&in); err != nil {
+			return nil, err
+		}
 		if err := ctx.BindQuery(&in); err != nil {
 			return nil, err
 		}

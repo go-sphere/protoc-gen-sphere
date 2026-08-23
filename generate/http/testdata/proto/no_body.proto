@@ -33,6 +33,7 @@ service NoBodyService {
 message GetItemRequest {
   int64 id = 1 [(sphere.binding.location) = BINDING_LOCATION_URI];
   string filter = 2 [(sphere.binding.location) = BINDING_LOCATION_QUERY];
+  string auth_token = 3 [(sphere.binding.location) = BINDING_LOCATION_HEADER];
 }
 
 message GetItemResponse {

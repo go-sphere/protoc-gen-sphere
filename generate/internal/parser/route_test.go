@@ -1,6 +1,9 @@
 package parser
 
-import "testing"
+import (
+	"strings"
+	"testing"
+)
 
 func TestHTTPRoute(t *testing.T) {
 	tests := []struct {
@@ -18,7 +21,9 @@ func TestHTTPRoute(t *testing.T) {
 		{"literal double wildcard", "/files/{path=assets/**}", "/files/assets/*path", false},
 		{"no params", "/api/test", "/api/test", false},
 		{"adds leading slash", "api/test", "/api/test", false},
-		{"dotted param name cleaned", "/api/{a.b}", "/api/:a_b", false},
+		{"dotted param rejected", "/api/{a.b}", "", true},
+		{"dotted wildcard rejected", "/api/{user.id=*}", "", true},
+		{"dotted catch-all rejected", "/api/{user.id=**}", "", true},
 		{"trailing slash trimmed", "/api/test/", "/api/test", false},
 		{"empty is error", "", "", true},
 	}
@@ -27,6 +32,12 @@ func TestHTTPRoute(t *testing.T) {
 			got, err := HTTPRoute(tt.in)
 			if (err != nil) != tt.wantErr {
 				t.Fatalf("HTTPRoute(%q) error = %v, wantErr = %v", tt.in, err, tt.wantErr)
+			}
+			if tt.wantErr {
+				if strings.Contains(tt.in, ".") && err != nil && !strings.Contains(err.Error(), "nested path") {
+					t.Errorf("error should mention nested path: %v", err)
+				}
+				return
 			}
 			if got != tt.want {
 				t.Errorf("HTTPRoute(%q) = %q, want %q", tt.in, got, tt.want)

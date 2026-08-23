@@ -2,7 +2,6 @@ package http
 
 import (
 	"fmt"
-	"slices"
 
 	"github.com/go-sphere/protoc-gen-sphere/generate/internal/parser"
 	"google.golang.org/protobuf/compiler/protogen"
@@ -34,7 +33,7 @@ func collectGoImport(file *protogen.File, gen *parser.GeneratedFile, conf *Confi
 LOOP:
 	for _, service := range file.Services {
 		for _, method := range service.Methods {
-			if hasValidateOptionsInMessage(method.Input) || slices.ContainsFunc(method.Input.Fields, hasValidateOptions) {
+			if requestNeedsValidate(method.Input) {
 				ident := validatePackage.Ident("Validate")
 				lines = append(lines, fmt.Sprintf("var _ = %s", gen.QualifiedGoIdent(ident)))
 				genConf.packageDesc.ValidateFunc = gen.QualifiedGoIdent(ident)
