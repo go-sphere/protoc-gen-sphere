@@ -71,7 +71,7 @@ func _BindingService_Mix0_HTTP_Handler(srv BindingServiceHTTPServer) httpx.Handl
 // @Summary Upload
 // @Description Upload exercises form binding together with a uri parameter. The request, has no JSON body: the form fields are decoded from the request form data.
 // @Tags testdata.binding.v1,testdata.binding.v1.BindingService
-// @Accept json
+// @Accept mpfd
 // @Produce json
 // @Param Authorization header string false "Bearer token"
 // @Param path_id path string true "path_id"

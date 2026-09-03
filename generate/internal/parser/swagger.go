@@ -47,7 +47,11 @@ func BuildAnnotations(g *GeneratedFile, m *protogen.Method, config *SwagParams) 
 		pkgName + "." + string(m.Parent.Desc.Name()),
 	}, ",") + "\n")
 
-	builder.WriteString("// @Accept json\n")
+	if len(config.FormVars) > 0 {
+		builder.WriteString("// @Accept mpfd\n")
+	} else {
+		builder.WriteString("// @Accept json\n")
+	}
 	builder.WriteString("// @Produce json\n")
 
 	// Add authentication if specified

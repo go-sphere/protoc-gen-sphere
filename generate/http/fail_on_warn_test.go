@@ -9,14 +9,14 @@ import (
 
 // TestFailOnWarn verifies ENC-25: with FailOnWarn disabled (the default) a
 // warning-triggering proto still generates, while enabling FailOnWarn promotes
-// the warning into a hard error so `buf generate` fails. The binding fixture's
-// Upload RPC is a POST that declares no body, which emits the "body is not
+// the warning into a hard error so `buf generate` fails. The no_body fixture's
+// GetItem RPC is a GET that declares a body, which emits the "body should not be
 // declared" warning.
 func TestFailOnWarn(t *testing.T) {
 	load := func(t *testing.T) (*protogen.Plugin, *protogen.File) {
 		t.Helper()
-		set := testutil.LoadDescriptorSet(t, "testdata/pb/binding.pb")
-		plugin := testutil.MustCreatePlugin(t, set, "binding.proto")
+		set := testutil.LoadDescriptorSet(t, "testdata/pb/no_body.pb")
+		plugin := testutil.MustCreatePlugin(t, set, "no_body.proto")
 		file := testutil.FileToGenerate(t, plugin)
 		return plugin, file
 	}
@@ -38,6 +38,17 @@ func TestFailOnWarn(t *testing.T) {
 		cfg.FailOnWarn = true
 		if _, err := GenerateFile(plugin, file, cfg); err == nil {
 			t.Fatal("expected GenerateFile to fail when FailOnWarn is enabled, got nil")
+		}
+	})
+
+	t.Run("form bindings do not emit warning under fail_on_warn", func(t *testing.T) {
+		set := testutil.LoadDescriptorSet(t, "testdata/pb/binding.pb")
+		plugin := testutil.MustCreatePlugin(t, set, "binding.proto")
+		file := testutil.FileToGenerate(t, plugin)
+		cfg := DefaultConfig()
+		cfg.FailOnWarn = true
+		if _, err := GenerateFile(plugin, file, cfg); err != nil {
+			t.Fatalf("expected form binding to succeed without warning when FailOnWarn is enabled, got: %v", err)
 		}
 	})
 }

@@ -75,7 +75,7 @@ func _IntegrationService_CreateItem0_HTTP_Handler(srv IntegrationServiceHTTPServ
 // @Summary UploadItem
 // @Description UploadItem decodes its payload from multipart form data (no JSON body).
 // @Tags testdata.integration.v1,testdata.integration.v1.IntegrationService
-// @Accept json
+// @Accept mpfd
 // @Produce json
 // @Param Authorization header string false "Bearer token"
 // @Param tenant_id path string true "tenant_id"

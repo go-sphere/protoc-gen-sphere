@@ -74,6 +74,10 @@ func buildHTTPRule(gen *parser.GeneratedFile, service *protogen.Service, m *prot
 	if res.Path == "" {
 		res.Path = defaultHTTPPath(conf.omitemptyPrefix, string(service.Desc.FullName()), string(m.Desc.Name()))
 	}
+	forms, err := parser.FormParams(m)
+	if err != nil {
+		return nil, err
+	}
 	if _, ok := parser.NoBodyMethods[res.Method]; ok {
 		if rule.Body != "" {
 			if err := conf.warn("method `%s.%s` body should not be declared. File: `%s`",
@@ -87,6 +91,18 @@ func buildHTTPRule(gen *parser.GeneratedFile, service *protogen.Service, m *prot
 		// GET/HEAD/DELETE/OPTIONS have no request body: even if a body was
 		// declared, force it off so the generated handler does not emit an
 		// unusable ctx.BindJSON call.
+		res.HasBody = false
+		res.Body = ""
+	} else if len(forms) > 0 {
+		if rule.Body != "" {
+			if err := conf.warn("method `%s.%s` body should not be declared when form parameters are present. File: `%s`",
+				m.Parent.Desc.Name(),
+				m.Desc.Name(),
+				m.Parent.Location.SourceFile,
+			); err != nil {
+				return nil, err
+			}
+		}
 		res.HasBody = false
 		res.Body = ""
 	} else if rule.Body == "" {
@@ -197,7 +213,7 @@ func buildMethodDesc(gen *parser.GeneratedFile, method *protogen.Method, rule *p
 		HasVars:      len(vars) > 0,
 		HasQuery:     len(queries) > 0,
 		HasForm:      len(forms) > 0,
-		HasBody:      rule.HasBody,
+		HasBody:      rule.HasBody && len(forms) == 0,
 		HasHeader:    len(headers) > 0,
 		NeedValidate: needValidate,
 
