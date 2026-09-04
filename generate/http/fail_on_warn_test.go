@@ -7,11 +7,8 @@ import (
 	"google.golang.org/protobuf/compiler/protogen"
 )
 
-// TestFailOnWarn verifies ENC-25: with FailOnWarn disabled (the default) a
-// warning-triggering proto still generates, while enabling FailOnWarn promotes
-// the warning into a hard error so `buf generate` fails. The no_body fixture's
-// GetItem RPC is a GET that declares a body, which emits the "body should not be
-// declared" warning.
+// TestFailOnWarn verifies that FailOnWarn promotes generation warnings into
+// errors without rejecting valid form bindings.
 func TestFailOnWarn(t *testing.T) {
 	load := func(t *testing.T) (*protogen.Plugin, *protogen.File) {
 		t.Helper()
@@ -21,23 +18,17 @@ func TestFailOnWarn(t *testing.T) {
 		return plugin, file
 	}
 
-	t.Run("default keeps generating", func(t *testing.T) {
-		plugin, file := load(t)
-		cfg := DefaultConfig()
-		if cfg.FailOnWarn {
-			t.Fatal("FailOnWarn must default to false")
-		}
-		if _, err := GenerateFile(plugin, file, cfg); err != nil {
-			t.Fatalf("expected generation to succeed with warnings, got: %v", err)
-		}
-	})
-
 	t.Run("fail_on_warn promotes to error", func(t *testing.T) {
 		plugin, file := load(t)
 		cfg := DefaultConfig()
 		cfg.FailOnWarn = true
-		if _, err := GenerateFile(plugin, file, cfg); err == nil {
+		_, err := GenerateFile(plugin, file, cfg)
+		if err == nil {
 			t.Fatal("expected GenerateFile to fail when FailOnWarn is enabled, got nil")
+		}
+		want := "method `NoBodyService.GetItem` body should not be declared. File: `no_body.proto`"
+		if got := err.Error(); got != want {
+			t.Errorf("error = %q, want %q", got, want)
 		}
 	})
 

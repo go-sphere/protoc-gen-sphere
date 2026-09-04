@@ -65,7 +65,7 @@ type genConfig struct {
 // ParseGoIdent parses a "import/path;Ident" string into a protogen.GoIdent.
 func ParseGoIdent(raw string) (protogen.GoIdent, error) {
 	parts := strings.Split(raw, ";")
-	if len(parts) != 2 {
+	if len(parts) != 2 || parts[0] == "" || parts[1] == "" {
 		return protogen.GoIdent{}, errors.New("invalid GoIdent format, expected 'path;ident'")
 	}
 	return protogen.GoIdent{

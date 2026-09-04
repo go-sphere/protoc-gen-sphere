@@ -1,7 +1,6 @@
 package http
 
 import (
-	"strings"
 	"testing"
 
 	"github.com/go-sphere/protoc-gen-sphere/generate/internal/parser"
@@ -25,47 +24,55 @@ func TestBindingLocationKindValidation(t *testing.T) {
 		}
 	}
 
-	t.Run("message bound to QUERY", func(t *testing.T) {
-		m := methods["QueryMessage"]
-		if m == nil {
-			t.Fatal("method QueryMessage not found")
-		}
-		_, err := parser.QueryParams(m, "POST", nil)
-		if err == nil {
-			t.Fatal("expected error for message field bound to QUERY, got nil")
-		}
-		if !strings.Contains(err.Error(), "QUERY") {
-			t.Errorf("error should mention QUERY: %v", err)
-		}
-	})
-
-	t.Run("message bound to URI", func(t *testing.T) {
-		m := methods["UriMessage"]
-		if m == nil {
-			t.Fatal("method UriMessage not found")
-		}
-		_, err := parser.URIParams(m, "/api/u/:inner")
-		if err == nil {
-			t.Fatal("expected error for message field bound to URI, got nil")
-		}
-		if !strings.Contains(err.Error(), "URI") {
-			t.Errorf("error should mention URI: %v", err)
-		}
-	})
-
-	t.Run("map bound to HEADER", func(t *testing.T) {
-		m := methods["HeaderMap"]
-		if m == nil {
-			t.Fatal("method HeaderMap not found")
-		}
-		_, err := parser.HeaderParams(m)
-		if err == nil {
-			t.Fatal("expected error for map field bound to HEADER, got nil")
-		}
-		if !strings.Contains(err.Error(), "HEADER") {
-			t.Errorf("error should mention HEADER: %v", err)
-		}
-	})
+	tests := []struct {
+		name    string
+		method  string
+		invoke  func(*protogen.Method) error
+		wantErr string
+	}{
+		{
+			name:   "message bound to QUERY",
+			method: "QueryMessage",
+			invoke: func(method *protogen.Method) error {
+				_, err := parser.QueryParams(method, "POST", nil)
+				return err
+			},
+			wantErr: "method `InvalidService.QueryMessage` field `inner` of type `message` cannot be bound to QUERY: only scalar types (and well-known scalar wrappers) are supported there. File: `invalid_binding.proto`, Message: `QueryMessageRequest`",
+		},
+		{
+			name:   "message bound to URI",
+			method: "UriMessage",
+			invoke: func(method *protogen.Method) error {
+				_, err := parser.URIParams(method, "/api/u/:inner")
+				return err
+			},
+			wantErr: "method `InvalidService.UriMessage` field `inner` of type `message` cannot be bound to URI: only scalar types (and well-known scalar wrappers) are supported there. File: `invalid_binding.proto`, Message: `UriMessageRequest`",
+		},
+		{
+			name:   "map bound to HEADER",
+			method: "HeaderMap",
+			invoke: func(method *protogen.Method) error {
+				_, err := parser.HeaderParams(method)
+				return err
+			},
+			wantErr: "method `InvalidService.HeaderMap` field `data` of type `map` cannot be bound to HEADER: only scalar types (and well-known scalar wrappers) are supported there. File: `invalid_binding.proto`, Message: `HeaderMapRequest`",
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			method := methods[tt.method]
+			if method == nil {
+				t.Fatalf("method %s not found", tt.method)
+			}
+			err := tt.invoke(method)
+			if err == nil {
+				t.Fatalf("expected error for %s, got nil", tt.method)
+			}
+			if got := err.Error(); got != tt.wantErr {
+				t.Errorf("error = %q, want %q", got, tt.wantErr)
+			}
+		})
+	}
 
 	t.Run("whole file generation fails fast", func(t *testing.T) {
 		// GenerateFile must surface the first binding error rather than emitting a
@@ -130,10 +137,8 @@ func TestURIParamsUnmatchedRouteParam(t *testing.T) {
 	if err == nil {
 		t.Fatal("expected error for unmatched {user.id}/:user_id route param")
 	}
-	if !strings.Contains(err.Error(), "user_id") {
-		t.Errorf("error should mention user_id: %v", err)
-	}
-	if !strings.Contains(err.Error(), "Nested path") {
-		t.Errorf("error should mention nested path variables: %v", err)
+	want := "method `NoBodyService.GetItem` route `/v1/users/:user_id` has parameter `user_id` that does not match a top-level request field. Nested path variables such as {user.id} are not supported; declare a top-level field and mark it BINDING_LOCATION_URI. File: `no_body.proto`, Message: `GetItemRequest`"
+	if got := err.Error(); got != want {
+		t.Errorf("error = %q, want %q", got, want)
 	}
 }
