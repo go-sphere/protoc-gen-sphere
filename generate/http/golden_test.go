@@ -70,6 +70,15 @@ func goldenCases() []goldenCase {
 			goldenFile: "testdata/golden/no_body.sphere.pb.go",
 		},
 		{
+			// Wildcard path segments: {path=**} -> /*path, {name=*} -> /:name,
+			// and {path=assets/**} -> /assets/*path.
+			name:       "wildcard",
+			pbFile:     "testdata/pb/wildcard.pb",
+			protoName:  "wildcard.proto",
+			wantFile:   true,
+			goldenFile: "testdata/golden/wildcard.sphere.pb.go",
+		},
+		{
 			name:      "no_http",
 			pbFile:    "testdata/pb/no_http.pb",
 			protoName: "no_http.proto",

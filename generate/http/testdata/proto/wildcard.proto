@@ -1,0 +1,54 @@
+syntax = "proto3";
+
+package testdata.wildcard.v1;
+
+import "google/api/annotations.proto";
+import "sphere/binding/binding.proto";
+
+option go_package = "github.com/go-sphere/protoc-gen-sphere/generate/http/testdata/gen/wildcardv1;wildcardv1";
+
+// FileService exercises wildcard path segments in google.api.http patterns:
+// `{param=**}` must map to a `*param` catch-all route, `{param=*}` to a
+// `:param` segment, and `{param=literal/**}` to a literal prefix followed by a
+// catch-all.
+service FileService {
+  // Download uses a bare double wildcard: /v1/files/{path=**} -> /v1/files/*path.
+  rpc Download(DownloadRequest) returns (DownloadResponse) {
+    option (google.api.http) = {get: "/v1/files/{path=**}"};
+  }
+
+  // Preview uses a single wildcard: /v1/preview/{name=*} -> /v1/preview/:name.
+  rpc Preview(PreviewRequest) returns (PreviewResponse) {
+    option (google.api.http) = {get: "/v1/preview/{name=*}"};
+  }
+
+  // Archive uses a literal prefix with a double wildcard:
+  // /v1/archive/{path=assets/**} -> /v1/archive/assets/*path.
+  rpc Archive(ArchiveRequest) returns (ArchiveResponse) {
+    option (google.api.http) = {get: "/v1/archive/{path=assets/**}"};
+  }
+}
+
+message DownloadRequest {
+  string path = 1 [(sphere.binding.location) = BINDING_LOCATION_URI];
+}
+
+message DownloadResponse {
+  bytes content = 1;
+}
+
+message PreviewRequest {
+  string name = 1 [(sphere.binding.location) = BINDING_LOCATION_URI];
+}
+
+message PreviewResponse {
+  string url = 1;
+}
+
+message ArchiveRequest {
+  string path = 1 [(sphere.binding.location) = BINDING_LOCATION_URI];
+}
+
+message ArchiveResponse {
+  bool ok = 1;
+}
