@@ -79,6 +79,16 @@ func goldenCases() []goldenCase {
 			goldenFile: "testdata/golden/wildcard.sphere.pb.go",
 		},
 		{
+			// Server-streaming methods (GET with URI/query/header bindings and
+			// POST with a JSON body) generate SSE handlers alongside a unary
+			// method; the client-streaming method is skipped with a warning.
+			name:       "streaming",
+			pbFile:     "testdata/pb/streaming.pb",
+			protoName:  "streaming.proto",
+			wantFile:   true,
+			goldenFile: "testdata/golden/streaming.sphere.pb.go",
+		},
+		{
 			name:      "no_http",
 			pbFile:    "testdata/pb/no_http.pb",
 			protoName: "no_http.proto",

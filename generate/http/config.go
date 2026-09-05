@@ -34,6 +34,8 @@ const (
 	DefaultErrorRespType     = defaultHTTPzPackage + ";ErrorResponse"
 	DefaultDataRespType      = defaultHTTPzPackage + ";DataResponse"
 	DefaultServerHandlerFunc = defaultHTTPzPackage + ";WithJson"
+	DefaultStreamHandlerFunc = defaultHTTPzPackage + ";WithSSE"
+	DefaultStreamType        = defaultHTTPzPackage + ";SSEStream"
 )
 
 // Config controls HTTP server code generation.
@@ -55,7 +57,14 @@ type Config struct {
 	DataRespType  protogen.GoIdent
 
 	ServerHandlerFunc protogen.GoIdent
-	ContextLoadFunc   string
+	// StreamHandlerFunc wraps server-streaming handlers (default
+	// httpz.WithSSE). It must accept a two-phase prepare function returning
+	// (StreamType[T], error).
+	StreamHandlerFunc protogen.GoIdent
+	// StreamType is the generic stream type returned by the prepare phase of
+	// a streaming handler (default httpz.SSEStream).
+	StreamType      protogen.GoIdent
+	ContextLoadFunc string
 }
 
 // fileConfig holds the per-file generation state derived from Config. It is
@@ -66,6 +75,12 @@ type fileConfig struct {
 	swaggerAuth     string
 	failOnWarn      bool
 	packageDesc     *template.PackageDesc
+	// serverHandlerFunc is the already-qualified unary wrapper; the stream
+	// idents stay unqualified until a server-streaming method needs them, so
+	// their imports are only added to files that use them.
+	serverHandlerFunc string
+	streamHandlerFunc protogen.GoIdent
+	streamType        protogen.GoIdent
 	// methodSets tracks the per-file duplicate count for each method GoName so
 	// MethodDesc.Num stays deterministic. It is scoped to a single generated file
 	// (created in generateFileContent) instead of a package global.
@@ -99,6 +114,8 @@ func (c *Config) Validate() error {
 		{name: "error_resp_type", ident: c.ErrorRespType},
 		{name: "data_resp_type", ident: c.DataRespType},
 		{name: "server_handler_func", ident: c.ServerHandlerFunc},
+		{name: "stream_handler_func", ident: c.StreamHandlerFunc},
+		{name: "stream_type", ident: c.StreamType},
 	}
 	for _, field := range required {
 		if field.ident.GoImportPath == "" || field.ident.GoName == "" {
@@ -130,6 +147,8 @@ func DefaultConfig() *Config {
 		ErrorRespType:     mustIdent(DefaultErrorRespType),
 		DataRespType:      mustIdent(DefaultDataRespType),
 		ServerHandlerFunc: mustIdent(DefaultServerHandlerFunc),
+		StreamHandlerFunc: mustIdent(DefaultStreamHandlerFunc),
+		StreamType:        mustIdent(DefaultStreamType),
 		ContextLoadFunc:   DefaultContextLoadFunc,
 	}
 }

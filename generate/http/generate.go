@@ -76,8 +76,7 @@ func generateFileContent(plugin *protogen.Plugin, file *protogen.File, gen *prot
 		ErrorResponseType: fileGen.QualifiedGoIdent(cfg.ErrorRespType),
 		DataResponseType:  gen.QualifiedGoIdent(cfg.DataRespType),
 
-		ServerHandlerWrapperFunc: gen.QualifiedGoIdent(cfg.ServerHandlerFunc),
-		ContextLoadFunc:          cfg.ContextLoadFunc,
+		ContextLoadFunc: cfg.ContextLoadFunc,
 	}
 	fileCfg := &fileConfig{
 		omitEmpty:       cfg.OmitEmpty,
@@ -85,7 +84,14 @@ func generateFileContent(plugin *protogen.Plugin, file *protogen.File, gen *prot
 		swaggerAuth:     cfg.SwaggerAuth,
 		failOnWarn:      cfg.FailOnWarn,
 		packageDesc:     pkgDesc,
-		methodSets:      make(map[string]int),
+		// The unary wrapper is qualified eagerly (collectGoImport keeps its
+		// import alive); the stream idents are qualified lazily in
+		// buildMethodDesc so files without streaming methods do not import
+		// their packages.
+		serverHandlerFunc: gen.QualifiedGoIdent(cfg.ServerHandlerFunc),
+		streamHandlerFunc: cfg.StreamHandlerFunc,
+		streamType:        cfg.StreamType,
+		methodSets:        make(map[string]int),
 	}
 
 	generateFileHeader(plugin, file, gen)
@@ -117,13 +123,15 @@ func generateFileContent(plugin *protogen.Plugin, file *protogen.File, gen *prot
 	return nil
 }
 
-// hasHTTPRule reports whether any non-streaming method in services needs HTTP
-// code. When omitEmpty is false every method qualifies (a default route is
-// synthesized); otherwise only methods carrying a google.api.http rule do.
+// hasHTTPRule reports whether any method in services needs HTTP code.
+// Client-streaming and bidirectional methods never qualify (they have no
+// HTTP/1.1 mapping); unary and server-streaming methods do. When omitEmpty is
+// false every such method qualifies (a default route is synthesized);
+// otherwise only methods carrying a google.api.http rule do.
 func hasHTTPRule(omitEmpty bool, services []*protogen.Service) bool {
 	for _, service := range services {
 		for _, method := range service.Methods {
-			if method.Desc.IsStreamingClient() || method.Desc.IsStreamingServer() {
+			if method.Desc.IsStreamingClient() {
 				continue
 			}
 			if !omitEmpty {

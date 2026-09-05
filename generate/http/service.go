@@ -13,9 +13,10 @@ import (
 	"google.golang.org/protobuf/proto"
 )
 
-// buildServiceDesc builds the template descriptor for a single service. Methods
-// that are streaming, or that lack an HTTP rule while omit-empty is enabled, are
-// skipped.
+// buildServiceDesc builds the template descriptor for a single service.
+// Server-streaming methods generate SSE handlers; client-streaming and
+// bidirectional methods, and methods that lack an HTTP rule while omit-empty
+// is enabled, are skipped.
 func buildServiceDesc(g *parser.GeneratedFile, service *protogen.Service, cfg *fileConfig) (*template.ServiceDesc, error) {
 	sd := &template.ServiceDesc{
 		ServiceType: service.GoName,
@@ -23,8 +24,10 @@ func buildServiceDesc(g *parser.GeneratedFile, service *protogen.Service, cfg *f
 		Package:     cfg.packageDesc,
 	}
 	for _, method := range service.Methods {
-		if method.Desc.IsStreamingClient() || method.Desc.IsStreamingServer() {
-			if err := cfg.warn("method `%s.%s` is streaming, it will be ignored. File: `%s`",
+		if method.Desc.IsStreamingClient() {
+			// Client and bidirectional streams have no HTTP/1.1 mapping;
+			// server-only streams map to Server-Sent Events and proceed.
+			if err := cfg.warn("method `%s.%s` is client/bidirectional streaming, it will be ignored. File: `%s`",
 				method.Parent.Desc.Name(),
 				method.Desc.Name(),
 				method.Parent.Location.SourceFile,
@@ -137,6 +140,20 @@ func buildMethodDesc(g *parser.GeneratedFile, method *protogen.Method, rule *par
 	comment := buildMethodComment(method)
 	needValidate := requestNeedsValidate(method.Input)
 
+	isServerStream := method.Desc.IsStreamingServer()
+	if isServerStream && rule.ResponseBody != "" {
+		// A stream delivers whole reply messages as events; there is no
+		// single response to project a field out of.
+		if err := cfg.warn("method `%s.%s` response_body is ignored on server-streaming methods. File: `%s`",
+			method.Parent.Desc.Name(),
+			method.Desc.Name(),
+			method.Parent.Location.SourceFile,
+		); err != nil {
+			return nil, err
+		}
+		rule.ResponseBody = ""
+	}
+
 	vars, err := parser.URIParams(method, route)
 	if err != nil {
 		return nil, err
@@ -169,6 +186,7 @@ func buildMethodDesc(g *parser.GeneratedFile, method *protogen.Method, rule *par
 		ResponseBody:  rule.ResponseBody,
 		DataResponse:  cfg.packageDesc.DataResponseType,
 		ErrorResponse: cfg.packageDesc.ErrorResponseType,
+		Stream:        isServerStream,
 	}
 
 	swagger, err := parser.BuildAnnotations(g, method, swag)
@@ -197,6 +215,13 @@ func buildMethodDesc(g *parser.GeneratedFile, method *protogen.Method, rule *par
 		response = "*" + response
 	}
 
+	handlerWrapper := cfg.serverHandlerFunc
+	streamType := ""
+	if isServerStream {
+		handlerWrapper = g.QualifiedGoIdent(cfg.streamHandlerFunc)
+		streamType = g.QualifiedGoIdent(cfg.streamType)
+	}
+
 	return &template.MethodDesc{
 		Name:         method.GoName,
 		OriginalName: string(method.Desc.Name()),
@@ -216,6 +241,10 @@ func buildMethodDesc(g *parser.GeneratedFile, method *protogen.Method, rule *par
 		HasBody:      rule.HasBody && len(forms) == 0,
 		HasHeader:    len(headers) > 0,
 		NeedValidate: needValidate,
+
+		IsServerStream:     isServerStream,
+		HandlerWrapperFunc: handlerWrapper,
+		StreamType:         streamType,
 
 		Swagger: swagger,
 

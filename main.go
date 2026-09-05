@@ -29,6 +29,8 @@ var (
 	errorRespType     = flag.String("error_resp_type", http.DefaultErrorRespType, "error response type")
 	dataRespType      = flag.String("data_resp_type", http.DefaultDataRespType, "data response type, must support generic")
 	serverHandlerFunc = flag.String("server_handler_func", http.DefaultServerHandlerFunc, "server handler func, must support generic")
+	streamHandlerFunc = flag.String("stream_handler_func", http.DefaultStreamHandlerFunc, "server-streaming handler wrapper func, must support generic")
+	streamType        = flag.String("stream_type", http.DefaultStreamType, "server-streaming prepare result type, must support generic")
 )
 
 func main() {
@@ -89,6 +91,14 @@ func extractConfig() (*http.Config, error) {
 	if err != nil {
 		return nil, err
 	}
+	parsedStreamHandlerFunc, err := http.ParseGoIdent(*streamHandlerFunc)
+	if err != nil {
+		return nil, err
+	}
+	parsedStreamType, err := http.ParseGoIdent(*streamType)
+	if err != nil {
+		return nil, err
+	}
 
 	cfg := http.DefaultConfig()
 	cfg.OmitEmpty = *omitEmpty
@@ -102,6 +112,8 @@ func extractConfig() (*http.Config, error) {
 	cfg.ErrorRespType = parsedErrorRespType
 	cfg.DataRespType = parsedDataRespType
 	cfg.ServerHandlerFunc = parsedServerHandlerFunc
+	cfg.StreamHandlerFunc = parsedStreamHandlerFunc
+	cfg.StreamType = parsedStreamType
 	cfg.ContextLoadFunc = *contextLoadFunc
 	if err := cfg.Validate(); err != nil {
 		return nil, err

@@ -58,6 +58,17 @@ type MethodDesc struct {
 	HasHeader    bool
 	NeedValidate bool
 
+	// IsServerStream marks a server-streaming method: the generated
+	// interface takes a push callback and the handler wraps a two-phase
+	// prepare/stream function instead of a (T, error) function.
+	IsServerStream bool
+	// HandlerWrapperFunc is the qualified wrapper applied to this method's
+	// handler (e.g. httpz.WithJson for unary, httpz.WithSSE for streams).
+	HandlerWrapperFunc string
+	// StreamType is the qualified generic stream type returned by the
+	// prepare phase (e.g. httpz.SSEStream). Set only for server streams.
+	StreamType string
+
 	Swagger string
 
 	Body         string
@@ -76,8 +87,7 @@ type PackageDesc struct {
 
 	ValidateFunc string
 
-	ServerHandlerWrapperFunc string
-	ContextLoadFunc          string
+	ContextLoadFunc string
 }
 
 // Renderer owns a parsed HTTP generation template. It is immutable after

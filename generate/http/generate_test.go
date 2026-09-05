@@ -64,8 +64,9 @@ func TestGenerateFile_NoService(t *testing.T) {
 	}
 }
 
-// TestGenerateFile_StreamingOnly verifies that streaming-only services are
-// skipped even when omit-empty is disabled.
+// TestGenerateFile_StreamingOnly verifies that services with only
+// client-streaming methods are skipped even when omit-empty is disabled.
+// (Server-streaming methods do generate code — see the streaming golden.)
 func TestGenerateFile_StreamingOnly(t *testing.T) {
 	fd := &descriptorpb.FileDescriptorProto{
 		Name:    proto.String("streaming.proto"),

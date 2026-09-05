@@ -25,6 +25,10 @@ type SwagParams struct {
 
 	DataResponse  string
 	ErrorResponse string
+
+	// Stream marks a server-streaming (SSE) method: the response is a
+	// text/event-stream of reply messages, not a DataResponse envelope.
+	Stream bool
 }
 
 var NoBodyMethods = map[string]struct{}{
@@ -52,7 +56,11 @@ func BuildAnnotations(g *GeneratedFile, m *protogen.Method, config *SwagParams) 
 	} else {
 		builder.WriteString("// @Accept json\n")
 	}
-	builder.WriteString("// @Produce json\n")
+	if config.Stream {
+		builder.WriteString("// @Produce text/event-stream\n")
+	} else {
+		builder.WriteString("// @Produce json\n")
+	}
 
 	// Add authentication if specified
 	if config.Auth != "" {
@@ -101,7 +109,13 @@ func BuildAnnotations(g *GeneratedFile, m *protogen.Method, config *SwagParams) 
 	if err != nil {
 		return "", err
 	}
-	builder.WriteString("// @Success 200 {object} " + config.DataResponse + "[" + responseType + "]\n")
+	if config.Stream {
+		// Swagger has no event-stream concept; document the per-event message
+		// type instead of pretending there is a DataResponse envelope.
+		builder.WriteString("// @Success 200 {object} " + responseType + " \"server-sent events stream of this message; terminated by a done or error event\"\n")
+	} else {
+		builder.WriteString("// @Success 200 {object} " + config.DataResponse + "[" + responseType + "]\n")
+	}
 	builder.WriteString("// @Failure 400,401,403,500,default {object} " + config.ErrorResponse + "\n")
 
 	builder.WriteString("// @Router " + config.Path + " [" + strings.ToLower(config.Method) + "]\n")

@@ -35,6 +35,8 @@ The behavior of `protoc-gen-sphere` can be customized with the following paramet
 | `data_resp_type`      | Fully qualified Go type for the data response model; must support generics.                                          | `github.com/go-sphere/sphere/server/httpz;DataResponse`     |
 | `error_resp_type`     | Fully qualified Go type for the error response model.                                                                | `github.com/go-sphere/sphere/server/httpz;ErrorResponse`    |
 | `server_handler_func` | Wrapper function that adapts the generated handler to the response model; must support generics.                    | `github.com/go-sphere/sphere/server/httpz;WithJson`         |
+| `stream_handler_func` | Wrapper function for server-streaming (SSE) handlers; must support generics.                                        | `github.com/go-sphere/sphere/server/httpz;WithSSE`          |
+| `stream_type`         | Generic stream type returned by the prepare phase of a streaming handler.                                            | `github.com/go-sphere/sphere/server/httpz;SSEStream`        |
 
 > Request binding no longer uses standalone `parse_*_func` flags. Binding is performed through methods on the
 > configured `context_type` (`BindJSON` / `BindQuery` / `BindURI` / `BindHeader` / `BindForm`), so customizing the
@@ -272,6 +274,46 @@ func main() {
 - **Flexible Binding**: Works with sphere binding annotations for fine-grained control
 - **Error Handling**: Integrates with sphere error handling framework with proper error propagation
 - **Route Constants**: Generates operation constants and endpoint arrays for easy reference
+- **Server Streaming (SSE)**: `rpc Watch(Req) returns (stream Resp)` generates a Server-Sent Events endpoint
+
+## Server-Streaming Methods
+
+A method declared with a `stream` reply generates an SSE handler instead of a
+unary one:
+
+```proto
+rpc Chat(ChatRequest) returns (stream ChatResponse) {
+  option (google.api.http) = {
+    post: "/api/chat"
+    body: "*"
+  };
+}
+```
+
+The generated server interface takes a push callback; return `nil` to end the
+stream with a terminal `done` event, or an error to end it with an `error`
+event (errors before the first send still produce a plain JSON error status):
+
+```go
+Chat(ctx context.Context, req *ChatRequest, send func(*ChatResponse) error) error
+```
+
+Each sent message is delivered as one SSE `data:` event encoded with the same
+JSON encoding as unary responses. Request binding and validation run before
+the stream commits, so those failures return regular 4xx JSON errors.
+
+Notes:
+
+- Client-streaming and bidirectional methods have no HTTP/1.1 mapping and are
+  skipped with a warning (an error with `fail_on_warn`).
+- `response_body` is ignored on streaming methods (warned): events carry whole
+  reply messages.
+- If the same proto is also compiled with `protoc-gen-go-grpc`, that plugin
+  generates a genuine gRPC streaming stub for the method — usually the desired
+  behavior, but the two transports are independent.
+- To let clients resume with `Last-Event-ID`, bind the header as a regular
+  request field (`BINDING_LOCATION_HEADER`); event IDs and resume semantics
+  are the service implementation's responsibility.
 
 ## HTTP Annotations Support
 

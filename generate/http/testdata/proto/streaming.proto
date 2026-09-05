@@ -1,0 +1,72 @@
+syntax = "proto3";
+
+package testdata.streaming.v1;
+
+import "google/api/annotations.proto";
+import "sphere/binding/binding.proto";
+
+option go_package = "github.com/go-sphere/protoc-gen-sphere/generate/http/testdata/gen/streamingv1;streamingv1";
+
+service StreamService {
+  // Server-streaming over GET: query-bound request, SSE response, and a
+  // Last-Event-ID header for business-side resume.
+  rpc Watch(WatchRequest) returns (stream WatchResponse) {
+    option (google.api.http) = {get: "/api/stream/watch/{topic}"};
+  }
+
+  // Server-streaming over POST with a JSON body (LLM-completion shape).
+  rpc Chat(ChatRequest) returns (stream ChatResponse) {
+    option (google.api.http) = {
+      post: "/api/stream/chat"
+      body: "*"
+    };
+  }
+
+  // Unary method in the same service: both shapes must coexist.
+  rpc Status(StatusRequest) returns (StatusResponse) {
+    option (google.api.http) = {get: "/api/stream/status"};
+  }
+
+  // Client streaming has no HTTP mapping and must be skipped with a warning.
+  rpc Upload(stream UploadRequest) returns (UploadResponse) {
+    option (google.api.http) = {
+      post: "/api/stream/upload"
+      body: "*"
+    };
+  }
+}
+
+message WatchRequest {
+  string topic = 1 [(sphere.binding.location) = BINDING_LOCATION_URI];
+  int64 limit = 2 [(sphere.binding.location) = BINDING_LOCATION_QUERY];
+  string last_event_id = 3 [(sphere.binding.location) = BINDING_LOCATION_HEADER];
+}
+
+message WatchResponse {
+  string event = 1;
+  int64 seq = 2;
+}
+
+message ChatRequest {
+  string prompt = 1;
+}
+
+message ChatResponse {
+  string delta = 1;
+}
+
+message StatusRequest {
+  string id = 1 [(sphere.binding.location) = BINDING_LOCATION_QUERY];
+}
+
+message StatusResponse {
+  string state = 1;
+}
+
+message UploadRequest {
+  bytes chunk = 1;
+}
+
+message UploadResponse {
+  int64 size = 1;
+}

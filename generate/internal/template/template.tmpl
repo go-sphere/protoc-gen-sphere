@@ -18,7 +18,11 @@ type {{.ServiceType}}HTTPServer interface {
 	{{- if ne .Comment ""}}
 	{{.Comment}}
 	{{- end}}
+	{{- if .IsServerStream}}
+	{{.Name}}(context.Context, *{{.Request}}, func({{.Response}}) error) error
+	{{- else}}
 	{{.Name}}(context.Context, *{{.Request}}) (*{{.Reply}}, error)
+	{{- end}}
 {{- end}}
 }
 
@@ -27,7 +31,11 @@ type {{.ServiceType}}HTTPServer interface {
 	{{.Swagger}}
     {{- end }}
 func _{{$svrType}}_{{.Name}}{{.Num}}_HTTP_Handler(srv {{$svrType}}HTTPServer) {{$packageDesc.HandlerType}}  {
-	return {{$packageDesc.ServerHandlerWrapperFunc}}(func(ctx {{$packageDesc.ContextType}}) ({{.Response}}, error) {
+	{{- if .IsServerStream}}
+	return {{.HandlerWrapperFunc}}(func(ctx {{$packageDesc.ContextType}}) ({{.StreamType}}[{{.Response}}], error) {
+	{{- else}}
+	return {{.HandlerWrapperFunc}}(func(ctx {{$packageDesc.ContextType}}) ({{.Response}}, error) {
+	{{- end}}
 		var in {{.Request}}
 		{{- if .HasBody}}
 		if err := ctx.BindJSON(&in{{.Body}}); err != nil {
@@ -59,11 +67,18 @@ func _{{$svrType}}_{{.Name}}{{.Num}}_HTTP_Handler(srv {{$svrType}}HTTPServer) {{
             return nil, err
         }
         {{- end}}
+		{{- if .IsServerStream}}
+		stdCtx := ctx{{$packageDesc.ContextLoadFunc}}
+		return func(send func({{.Response}}) error) error {
+			return srv.{{.Name}}(stdCtx, &in, send)
+		}, nil
+		{{- else}}
 		out, err := srv.{{.Name}}(ctx{{$packageDesc.ContextLoadFunc}}, &in)
 		if err != nil {
 			return nil, err
 		}
 		return out{{.ResponseBody}}, nil
+		{{- end}}
 	})
 }
 {{end}}
