@@ -4,6 +4,8 @@
 package http
 
 import (
+	"errors"
+
 	"github.com/go-sphere/protoc-gen-sphere/generate/internal/parser"
 	"github.com/go-sphere/protoc-gen-sphere/generate/internal/template"
 	"google.golang.org/genproto/googleapis/api/annotations"
@@ -13,30 +15,53 @@ import (
 
 const contextPackage = protogen.GoImportPath("context")
 
-// ReplaceTemplateIfNeed overrides the built-in code template with the file at
-// path when path is non-empty. It must be called once before GenerateFile. It
-// is a thin wrapper over the internal template package so that callers (e.g.
-// main) need not import that internal package directly.
-func ReplaceTemplateIfNeed(path string) error {
-	return template.ReplaceTemplateIfNeed(path)
+// Generator owns validated configuration and an immutable parsed template.
+type Generator struct {
+	cfg      *Config
+	renderer *template.Renderer
+}
+
+// NewGenerator validates cfg and loads its template once for reuse across all
+// files in a protoc invocation.
+func NewGenerator(cfg *Config) (*Generator, error) {
+	if cfg == nil {
+		return nil, errors.New("config is required")
+	}
+	if err := cfg.Validate(); err != nil {
+		return nil, err
+	}
+	renderer, err := template.NewRenderer(cfg.TemplateFile)
+	if err != nil {
+		return nil, err
+	}
+	return &Generator{cfg: new(*cfg), renderer: renderer}, nil
+}
+
+// GenerateFile is a convenience wrapper for generating one file. Callers that
+// generate multiple files should construct a Generator and reuse it.
+func GenerateFile(plugin *protogen.Plugin, file *protogen.File, cfg *Config) (*protogen.GeneratedFile, error) {
+	generator, err := NewGenerator(cfg)
+	if err != nil {
+		return nil, err
+	}
+	return generator.GenerateFile(plugin, file)
 }
 
 // GenerateFile generates the .sphere.pb.go file for a single proto file. It
 // returns (nil, nil) when the file has no service that needs HTTP code.
-func GenerateFile(plugin *protogen.Plugin, file *protogen.File, conf *Config) (*protogen.GeneratedFile, error) {
-	if len(file.Services) == 0 || !hasHTTPRule(conf.Omitempty, file.Services) {
+func (g *Generator) GenerateFile(plugin *protogen.Plugin, file *protogen.File) (*protogen.GeneratedFile, error) {
+	if len(file.Services) == 0 || !hasHTTPRule(g.cfg.OmitEmpty, file.Services) {
 		return nil, nil
 	}
 	filename := file.GeneratedFilenamePrefix + ".sphere.pb.go"
-	g := plugin.NewGeneratedFile(filename, file.GoImportPath)
-	err := generateFileContent(plugin, file, g, conf)
-	if err != nil {
+	generated := plugin.NewGeneratedFile(filename, file.GoImportPath)
+	if err := generateFileContent(plugin, file, generated, g.cfg, g.renderer); err != nil {
 		return nil, err
 	}
-	return g, nil
+	return generated, nil
 }
 
-func generateFileContent(plugin *protogen.Plugin, file *protogen.File, gen *protogen.GeneratedFile, conf *Config) error {
+func generateFileContent(plugin *protogen.Plugin, file *protogen.File, gen *protogen.GeneratedFile, cfg *Config, renderer *template.Renderer) error {
 	if len(file.Services) == 0 {
 		return nil
 	}
@@ -44,33 +69,30 @@ func generateFileContent(plugin *protogen.Plugin, file *protogen.File, gen *prot
 	fileGen := parser.NewGen(gen)
 	fileGen.QualifiedGoIdent(contextPackage.Ident("Context"))
 	pkgDesc := &template.PackageDesc{
-		RouterType:  fileGen.QualifiedGoIdent(conf.RouterType),
-		ContextType: fileGen.QualifiedGoIdent(conf.ContextType),
-		HandlerType: fileGen.QualifiedGoIdent(conf.HandlerType),
+		RouterType:  fileGen.QualifiedGoIdent(cfg.RouterType),
+		ContextType: fileGen.QualifiedGoIdent(cfg.ContextType),
+		HandlerType: fileGen.QualifiedGoIdent(cfg.HandlerType),
 
-		ErrorResponseType: fileGen.QualifiedGoIdent(conf.ErrorRespType),
-		DataResponseType:  gen.QualifiedGoIdent(conf.DataRespType),
+		ErrorResponseType: fileGen.QualifiedGoIdent(cfg.ErrorRespType),
+		DataResponseType:  gen.QualifiedGoIdent(cfg.DataRespType),
 
-		ServerHandlerWrapperFunc: gen.QualifiedGoIdent(conf.ServerHandlerFunc),
-		ContextLoadFunc:          conf.ContextLoadFunc,
+		ServerHandlerWrapperFunc: gen.QualifiedGoIdent(cfg.ServerHandlerFunc),
+		ContextLoadFunc:          cfg.ContextLoadFunc,
 	}
-	genConf := &genConfig{
-		omitempty:       conf.Omitempty,
-		omitemptyPrefix: conf.OmitemptyPrefix,
-		swaggerAuth:     conf.SwaggerAuth,
-		failOnWarn:      conf.FailOnWarn,
+	fileCfg := &fileConfig{
+		omitEmpty:       cfg.OmitEmpty,
+		omitEmptyPrefix: cfg.OmitEmptyPrefix,
+		swaggerAuth:     cfg.SwaggerAuth,
+		failOnWarn:      cfg.FailOnWarn,
 		packageDesc:     pkgDesc,
 		methodSets:      make(map[string]int),
 	}
 
-	headerLines := collectFileHeader(plugin, file)
-	for _, line := range headerLines {
-		gen.P(line)
-	}
+	generateFileHeader(plugin, file, gen)
 
 	var services []*template.ServiceDesc
 	for _, service := range file.Services {
-		sd, err := buildServiceDesc(fileGen, service, genConf)
+		sd, err := buildServiceDesc(fileGen, service, fileCfg)
 		if err != nil {
 			return err
 		}
@@ -79,13 +101,13 @@ func generateFileContent(plugin *protogen.Plugin, file *protogen.File, gen *prot
 		}
 		services = append(services, sd)
 	}
-	importLines := collectGoImport(file, fileGen, conf, genConf)
+	importLines := collectGoImport(file, fileGen, cfg, fileCfg)
 	for _, line := range importLines {
 		gen.P(line)
 	}
 	gen.P()
 	for _, sd := range services {
-		content, err := sd.Execute()
+		content, err := renderer.Execute(sd)
 		if err != nil {
 			return err
 		}
@@ -95,25 +117,16 @@ func generateFileContent(plugin *protogen.Plugin, file *protogen.File, gen *prot
 	return nil
 }
 
-func collectFileHeader(plugin *protogen.Plugin, file *protogen.File) []string {
-	return formatFileHeader(
-		protocVersion(plugin),
-		file.Desc.Path(),
-		string(file.GoPackageName),
-		file.Proto.GetOptions().GetDeprecated(),
-	)
-}
-
 // hasHTTPRule reports whether any non-streaming method in services needs HTTP
-// code. When omitempty is false every method qualifies (a default route is
+// code. When omitEmpty is false every method qualifies (a default route is
 // synthesized); otherwise only methods carrying a google.api.http rule do.
-func hasHTTPRule(omitempty bool, services []*protogen.Service) bool {
+func hasHTTPRule(omitEmpty bool, services []*protogen.Service) bool {
 	for _, service := range services {
 		for _, method := range service.Methods {
 			if method.Desc.IsStreamingClient() || method.Desc.IsStreamingServer() {
 				continue
 			}
-			if !omitempty {
+			if !omitEmpty {
 				return true
 			}
 			ext := proto.GetExtension(method.Desc.Options(), annotations.E_Http)

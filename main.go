@@ -9,12 +9,14 @@ import (
 	"google.golang.org/protobuf/types/pluginpb"
 )
 
+const version = "0.0.1"
+
 var (
 	showVersion = flag.Bool("version", false, "print the version and exit")
 
-	omitempty       = flag.Bool("omitempty", true, "omit if google.api is empty")
-	omitemptyPrefix = flag.String("omitempty_prefix", "", "omit if google.api is empty")
-	failOnWarn      = flag.Bool("fail_on_warn", false, "treat generation warnings (streaming skips, GET/DELETE body, missing body) as hard errors")
+	omitEmpty       = flag.Bool("omitempty", http.DefaultOmitEmpty, "omit if google.api is empty")
+	omitEmptyPrefix = flag.String("omitempty_prefix", http.DefaultOmitEmptyPrefix, "omit if google.api is empty")
+	failOnWarn      = flag.Bool("fail_on_warn", http.DefaultFailOnWarn, "treat generation warnings (streaming skips, GET/DELETE body, missing body) as hard errors")
 
 	templateFile      = flag.String("template_file", "", "template file, if not set, use default template")
 	swaggerAuthHeader = flag.String("swagger_auth_header", http.DefaultSwaggerAuthHeader, "swagger auth header")
@@ -32,77 +34,77 @@ var (
 func main() {
 	flag.Parse()
 	if *showVersion {
-		fmt.Printf("protoc-gen-sphere %v\n", "0.0.1")
+		fmt.Printf("protoc-gen-sphere %s\n", version)
 		return
 	}
 	protogen.Options{
 		ParamFunc: flag.CommandLine.Set,
-	}.Run(func(gen *protogen.Plugin) error {
-		gen.SupportedFeatures = uint64(pluginpb.CodeGeneratorResponse_FEATURE_PROTO3_OPTIONAL)
-		conf, err := extractConfig()
-		if err != nil {
+	}.Run(run)
+}
+
+func run(plugin *protogen.Plugin) error {
+	plugin.SupportedFeatures = uint64(pluginpb.CodeGeneratorResponse_FEATURE_PROTO3_OPTIONAL)
+	cfg, err := extractConfig()
+	if err != nil {
+		return err
+	}
+	generator, err := http.NewGenerator(cfg)
+	if err != nil {
+		return err
+	}
+	for _, file := range plugin.Files {
+		if !file.Generate {
+			continue
+		}
+		if _, err := generator.GenerateFile(plugin, file); err != nil {
 			return err
 		}
-		err = http.ReplaceTemplateIfNeed(conf.TemplateFile)
-		if err != nil {
-			return err
-		}
-		for _, f := range gen.Files {
-			if !f.Generate {
-				continue
-			}
-			_, gErr := http.GenerateFile(gen, f, conf)
-			if gErr != nil {
-				return gErr
-			}
-		}
-		return nil
-	})
+	}
+	return nil
 }
 
 func extractConfig() (*http.Config, error) {
-	_routerType, err := http.ParseGoIdent(*routerType)
+	parsedRouterType, err := http.ParseGoIdent(*routerType)
 	if err != nil {
 		return nil, err
 	}
-	_contextType, err := http.ParseGoIdent(*contextType)
+	parsedContextType, err := http.ParseGoIdent(*contextType)
 	if err != nil {
 		return nil, err
 	}
-	_handlerType, err := http.ParseGoIdent(*handlerType)
+	parsedHandlerType, err := http.ParseGoIdent(*handlerType)
 	if err != nil {
 		return nil, err
 	}
-	_errorRespType, err := http.ParseGoIdent(*errorRespType)
+	parsedErrorRespType, err := http.ParseGoIdent(*errorRespType)
 	if err != nil {
 		return nil, err
 	}
-	_dataRespType, err := http.ParseGoIdent(*dataRespType)
-	if err != nil {
-		return nil, err
-	}
-
-	_serverHandlerFunc, err := http.ParseGoIdent(*serverHandlerFunc)
+	parsedDataRespType, err := http.ParseGoIdent(*dataRespType)
 	if err != nil {
 		return nil, err
 	}
 
-	conf := &http.Config{
-		Omitempty:       *omitempty,
-		OmitemptyPrefix: *omitemptyPrefix,
-		FailOnWarn:      *failOnWarn,
-
-		SwaggerAuth:  *swaggerAuthHeader,
-		TemplateFile: *templateFile,
-
-		RouterType:    _routerType,
-		ContextType:   _contextType,
-		HandlerType:   _handlerType,
-		ErrorRespType: _errorRespType,
-		DataRespType:  _dataRespType,
-
-		ServerHandlerFunc: _serverHandlerFunc,
-		ContextLoadFunc:   *contextLoadFunc,
+	parsedServerHandlerFunc, err := http.ParseGoIdent(*serverHandlerFunc)
+	if err != nil {
+		return nil, err
 	}
-	return conf, nil
+
+	cfg := http.DefaultConfig()
+	cfg.OmitEmpty = *omitEmpty
+	cfg.OmitEmptyPrefix = *omitEmptyPrefix
+	cfg.FailOnWarn = *failOnWarn
+	cfg.SwaggerAuth = *swaggerAuthHeader
+	cfg.TemplateFile = *templateFile
+	cfg.RouterType = parsedRouterType
+	cfg.ContextType = parsedContextType
+	cfg.HandlerType = parsedHandlerType
+	cfg.ErrorRespType = parsedErrorRespType
+	cfg.DataRespType = parsedDataRespType
+	cfg.ServerHandlerFunc = parsedServerHandlerFunc
+	cfg.ContextLoadFunc = *contextLoadFunc
+	if err := cfg.Validate(); err != nil {
+		return nil, err
+	}
+	return cfg, nil
 }

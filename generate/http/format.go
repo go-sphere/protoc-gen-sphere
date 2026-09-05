@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"strings"
 
+	"google.golang.org/protobuf/compiler/protogen"
 	"google.golang.org/protobuf/types/pluginpb"
 )
 
@@ -36,6 +37,18 @@ func formatFileHeader(version, sourcePath, pkgName string, deprecated bool) []st
 	}
 	lines = append(lines, "", fmt.Sprintf("package %s", pkgName), "")
 	return lines
+}
+
+func generateFileHeader(plugin *protogen.Plugin, file *protogen.File, g *protogen.GeneratedFile) {
+	lines := formatFileHeader(
+		protocVersion(plugin),
+		file.Desc.Path(),
+		string(file.GoPackageName),
+		file.Proto.GetOptions().GetDeprecated(),
+	)
+	for _, line := range lines {
+		g.P(line)
+	}
 }
 
 // formatMethodComment formats a method's leading proto comment into Go doc

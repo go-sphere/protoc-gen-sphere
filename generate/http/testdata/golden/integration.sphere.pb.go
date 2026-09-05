@@ -11,9 +11,9 @@ import (
 	httpz "github.com/go-sphere/sphere/server/httpz"
 )
 
-var _ = (*context.Context)(nil)
-var _ = (*httpx.Router)(nil)
-var _ = (*httpz.ErrorResponse)(nil)
+var _ = new(context.Context)
+var _ = new(httpx.Router)
+var _ = new(httpz.ErrorResponse)
 
 const OperationIntegrationServiceCreateItem = "/testdata.integration.v1.IntegrationService/CreateItem"
 const OperationIntegrationServiceListItems = "/testdata.integration.v1.IntegrationService/ListItems"

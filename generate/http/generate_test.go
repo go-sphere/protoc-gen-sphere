@@ -65,7 +65,7 @@ func TestGenerateFile_NoService(t *testing.T) {
 }
 
 // TestGenerateFile_StreamingOnly verifies that streaming-only services are
-// skipped even when omitempty is disabled.
+// skipped even when omit-empty is disabled.
 func TestGenerateFile_StreamingOnly(t *testing.T) {
 	fd := &descriptorpb.FileDescriptorProto{
 		Name:    proto.String("streaming.proto"),
@@ -92,12 +92,27 @@ func TestGenerateFile_StreamingOnly(t *testing.T) {
 	plugin := newPlugin(t, fd)
 
 	cfg := DefaultConfig()
-	cfg.Omitempty = false
+	cfg.OmitEmpty = false
 	genFile, err := GenerateFile(plugin, plugin.Files[0], cfg)
 	if err != nil {
 		t.Fatalf("GenerateFile failed: %v", err)
 	}
 	if genFile != nil {
 		t.Error("expected nil for streaming-only service, got non-nil")
+	}
+}
+
+func TestNewGeneratorSnapshotsConfig(t *testing.T) {
+	cfg := DefaultConfig()
+	generator, err := NewGenerator(cfg)
+	if err != nil {
+		t.Fatalf("NewGenerator() error = %v", err)
+	}
+	cfg.OmitEmpty = false
+	if !generator.cfg.OmitEmpty {
+		t.Fatal("Generator configuration changed after caller mutation")
+	}
+	if _, err := NewGenerator(nil); err == nil {
+		t.Fatal("NewGenerator(nil) error = nil")
 	}
 }

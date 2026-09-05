@@ -1,14 +1,17 @@
+// Package template renders the HTTP server scaffolding emitted by
+// protoc-gen-sphere.
 package template
 
 import (
 	_ "embed"
+	"fmt"
 	"os"
 	"strings"
 	"text/template"
 )
 
 //go:embed template.tmpl
-var httpTemplate string
+var defaultTemplate string
 
 /*
 service TestService {
@@ -21,6 +24,7 @@ service TestService {
 }
 */
 
+// ServiceDesc is the template model for one generated HTTP service.
 type ServiceDesc struct {
 	ServiceType string // TestService
 	ServiceName string // shared.v1.TestService
@@ -31,6 +35,7 @@ type ServiceDesc struct {
 	Package *PackageDesc
 }
 
+// MethodDesc is the template model for one generated HTTP method.
 type MethodDesc struct {
 	// method
 	Name         string // rpc method name: RunTest
@@ -59,6 +64,8 @@ type MethodDesc struct {
 	ResponseBody string
 }
 
+// PackageDesc contains the qualified package-level identifiers used by a
+// generated HTTP service.
 type PackageDesc struct {
 	RouterType  string
 	ContextType string
@@ -73,30 +80,39 @@ type PackageDesc struct {
 	ContextLoadFunc          string
 }
 
-func (s *ServiceDesc) Execute() (string, error) {
+// Renderer owns a parsed HTTP generation template. It is immutable after
+// construction and safe to reuse for every file in one plugin invocation.
+type Renderer struct {
+	template *template.Template
+}
+
+// NewRenderer loads and parses the embedded template, or the file at path when
+// path is non-empty.
+func NewRenderer(path string) (*Renderer, error) {
+	source := defaultTemplate
+	if path != "" {
+		raw, err := os.ReadFile(path)
+		if err != nil {
+			return nil, fmt.Errorf("read template %q: %w", path, err)
+		}
+		source = string(raw)
+	}
+	tmpl, err := template.New("http").Parse(source)
+	if err != nil {
+		return nil, fmt.Errorf("parse template: %w", err)
+	}
+	return &Renderer{template: tmpl}, nil
+}
+
+// Execute renders a service descriptor.
+func (r *Renderer) Execute(s *ServiceDesc) (string, error) {
 	s.MethodSets = make(map[string]*MethodDesc)
 	for _, m := range s.Methods {
 		s.MethodSets[m.Name] = m
 	}
 	var buf strings.Builder
-	tmpl, err := template.New("http").Parse(httpTemplate)
-	if err != nil {
-		return "", err
-	}
-	err = tmpl.Execute(&buf, s)
-	if err != nil {
-		return "", err
+	if err := r.template.Execute(&buf, s); err != nil {
+		return "", fmt.Errorf("execute template: %w", err)
 	}
 	return buf.String(), nil
-}
-
-func ReplaceTemplateIfNeed(path string) error {
-	if path != "" {
-		raw, err := os.ReadFile(path)
-		if err != nil {
-			return err
-		}
-		httpTemplate = string(raw)
-	}
-	return nil
 }

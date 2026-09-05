@@ -14,17 +14,17 @@ import (
 )
 
 // buildServiceDesc builds the template descriptor for a single service. Methods
-// that are streaming, or that lack an http rule while omitempty is enabled, are
+// that are streaming, or that lack an HTTP rule while omit-empty is enabled, are
 // skipped.
-func buildServiceDesc(gen *parser.GeneratedFile, service *protogen.Service, conf *genConfig) (*template.ServiceDesc, error) {
+func buildServiceDesc(g *parser.GeneratedFile, service *protogen.Service, cfg *fileConfig) (*template.ServiceDesc, error) {
 	sd := &template.ServiceDesc{
 		ServiceType: service.GoName,
 		ServiceName: string(service.Desc.FullName()),
-		Package:     conf.packageDesc,
+		Package:     cfg.packageDesc,
 	}
 	for _, method := range service.Methods {
 		if method.Desc.IsStreamingClient() || method.Desc.IsStreamingServer() {
-			if err := conf.warn("method `%s.%s` is streaming, it will be ignored. File: `%s`",
+			if err := cfg.warn("method `%s.%s` is streaming, it will be ignored. File: `%s`",
 				method.Parent.Desc.Name(),
 				method.Desc.Name(),
 				method.Parent.Location.SourceFile,
@@ -36,20 +36,20 @@ func buildServiceDesc(gen *parser.GeneratedFile, service *protogen.Service, conf
 		rule, ok := proto.GetExtension(method.Desc.Options(), annotations.E_Http).(*annotations.HttpRule)
 		if rule != nil && ok {
 			for _, bind := range rule.AdditionalBindings {
-				desc, err := buildHTTPRule(gen, service, method, bind, conf)
+				desc, err := buildHTTPRule(g, service, method, bind, cfg)
 				if err != nil {
 					return nil, err
 				}
 				sd.Methods = append(sd.Methods, desc)
 			}
-			desc, err := buildHTTPRule(gen, service, method, rule, conf)
+			desc, err := buildHTTPRule(g, service, method, rule, cfg)
 			if err != nil {
 				return nil, err
 			}
 			sd.Methods = append(sd.Methods, desc)
-		} else if !conf.omitempty {
+		} else if !cfg.omitEmpty {
 			// Method with no http_rule defined, automatically generating a default POST method.
-			path := defaultHTTPPath(conf.omitemptyPrefix, string(service.Desc.FullName()), string(method.Desc.Name()))
+			path := defaultHTTPPath(cfg.omitEmptyPrefix, string(service.Desc.FullName()), string(method.Desc.Name()))
 			// Body "" with HasBody mirrors ParseHttpRule's normalization of
 			// body:"*" (the whole request message is the body).
 			res := &parser.HttpRule{
@@ -59,7 +59,7 @@ func buildServiceDesc(gen *parser.GeneratedFile, service *protogen.Service, conf
 				Body:         "",
 				ResponseBody: "",
 			}
-			desc, err := buildMethodDesc(gen, method, res, conf)
+			desc, err := buildMethodDesc(g, method, res, cfg)
 			if err != nil {
 				return nil, err
 			}
@@ -69,21 +69,21 @@ func buildServiceDesc(gen *parser.GeneratedFile, service *protogen.Service, conf
 	return sd, nil
 }
 
-func buildHTTPRule(gen *parser.GeneratedFile, service *protogen.Service, m *protogen.Method, rule *annotations.HttpRule, conf *genConfig) (*template.MethodDesc, error) {
+func buildHTTPRule(g *parser.GeneratedFile, service *protogen.Service, method *protogen.Method, rule *annotations.HttpRule, cfg *fileConfig) (*template.MethodDesc, error) {
 	res := parser.ParseHttpRule(rule)
 	if res.Path == "" {
-		res.Path = defaultHTTPPath(conf.omitemptyPrefix, string(service.Desc.FullName()), string(m.Desc.Name()))
+		res.Path = defaultHTTPPath(cfg.omitEmptyPrefix, string(service.Desc.FullName()), string(method.Desc.Name()))
 	}
-	forms, err := parser.FormParams(m)
+	forms, err := parser.FormParams(method)
 	if err != nil {
 		return nil, err
 	}
 	if _, ok := parser.NoBodyMethods[res.Method]; ok {
 		if rule.Body != "" {
-			if err := conf.warn("method `%s.%s` body should not be declared. File: `%s`",
-				m.Parent.Desc.Name(),
-				m.Desc.Name(),
-				m.Parent.Location.SourceFile,
+			if err := cfg.warn("method `%s.%s` body should not be declared. File: `%s`",
+				method.Parent.Desc.Name(),
+				method.Desc.Name(),
+				method.Parent.Location.SourceFile,
 			); err != nil {
 				return nil, err
 			}
@@ -95,10 +95,10 @@ func buildHTTPRule(gen *parser.GeneratedFile, service *protogen.Service, m *prot
 		res.Body = ""
 	} else if len(forms) > 0 {
 		if rule.Body != "" {
-			if err := conf.warn("method `%s.%s` body should not be declared when form parameters are present. File: `%s`",
-				m.Parent.Desc.Name(),
-				m.Desc.Name(),
-				m.Parent.Location.SourceFile,
+			if err := cfg.warn("method `%s.%s` body should not be declared when form parameters are present. File: `%s`",
+				method.Parent.Desc.Name(),
+				method.Desc.Name(),
+				method.Parent.Location.SourceFile,
 			); err != nil {
 				return nil, err
 			}
@@ -106,22 +106,22 @@ func buildHTTPRule(gen *parser.GeneratedFile, service *protogen.Service, m *prot
 		res.HasBody = false
 		res.Body = ""
 	} else if rule.Body == "" {
-		if err := conf.warn("method `%s.%s` body is not declared. File: `%s`",
-			m.Parent.Desc.Name(),
-			m.Desc.Name(),
-			m.Parent.Location.SourceFile,
+		if err := cfg.warn("method `%s.%s` body is not declared. File: `%s`",
+			method.Parent.Desc.Name(),
+			method.Desc.Name(),
+			method.Parent.Location.SourceFile,
 		); err != nil {
 			return nil, err
 		}
 	}
-	md, err := buildMethodDesc(gen, m, res, conf)
+	md, err := buildMethodDesc(g, method, res, cfg)
 	if err != nil {
 		return nil, err
 	}
 	return md, nil
 }
 
-func buildMethodDesc(gen *parser.GeneratedFile, method *protogen.Method, rule *parser.HttpRule, conf *genConfig) (*template.MethodDesc, error) {
+func buildMethodDesc(g *parser.GeneratedFile, method *protogen.Method, rule *parser.HttpRule, cfg *fileConfig) (*template.MethodDesc, error) {
 	route, err := parser.HTTPRoute(rule.Path)
 	if err != nil {
 		return nil, fmt.Errorf("method `%s.%s` route `%s` parse error: %v. File: `%s`",
@@ -132,9 +132,9 @@ func buildMethodDesc(gen *parser.GeneratedFile, method *protogen.Method, rule *p
 			method.Parent.Location.SourceFile,
 		)
 	}
-	defer func() { conf.methodSets[method.GoName]++ }()
+	defer func() { cfg.methodSets[method.GoName]++ }()
 
-	comment := buildMethodCommend(method)
+	comment := buildMethodComment(method)
 	needValidate := requestNeedsValidate(method.Input)
 
 	vars, err := parser.URIParams(method, route)
@@ -160,18 +160,18 @@ func buildMethodDesc(gen *parser.GeneratedFile, method *protogen.Method, rule *p
 	swag := &parser.SwagParams{
 		Method:        rule.Method,
 		Path:          parser.HTTPRouteToSwaggerRoute(route),
-		Auth:          conf.swaggerAuth,
+		Auth:          cfg.swaggerAuth,
 		PathVars:      vars,
 		QueryVars:     queries,
 		FormVars:      forms,
 		HeaderVars:    headers,
 		Body:          rule.Body,
 		ResponseBody:  rule.ResponseBody,
-		DataResponse:  conf.packageDesc.DataResponseType,
-		ErrorResponse: conf.packageDesc.ErrorResponseType,
+		DataResponse:  cfg.packageDesc.DataResponseType,
+		ErrorResponse: cfg.packageDesc.ErrorResponseType,
 	}
 
-	swagger, err := parser.BuildAnnotations(gen, method, swag)
+	swagger, err := parser.BuildAnnotations(g, method, swag)
 	if err != nil {
 		return nil, err
 	}
@@ -180,7 +180,7 @@ func buildMethodDesc(gen *parser.GeneratedFile, method *protogen.Method, rule *p
 
 	responsePath := dotPrefixedPath(parser.ProtoKeyPathToGoKeyPath(method.Output, strings.Split(rule.ResponseBody, ".")))
 
-	response := gen.QualifiedGoIdent(method.Output.GoIdent)
+	response := g.QualifiedGoIdent(method.Output.GoIdent)
 	if responsePath != "" {
 		responseField := parser.ProtoKeyPathToField(method.Output, strings.Split(rule.ResponseBody, "."))
 		if responseField == nil {
@@ -192,7 +192,7 @@ func buildMethodDesc(gen *parser.GeneratedFile, method *protogen.Method, rule *p
 				method.Parent.Location.SourceFile,
 			)
 		}
-		response = parser.ProtoTypeToGoType(gen, responseField, true)
+		response = parser.ProtoTypeToGoType(g, responseField, true)
 	} else {
 		response = "*" + response
 	}
@@ -200,12 +200,12 @@ func buildMethodDesc(gen *parser.GeneratedFile, method *protogen.Method, rule *p
 	return &template.MethodDesc{
 		Name:         method.GoName,
 		OriginalName: string(method.Desc.Name()),
-		Num:          conf.methodSets[method.GoName],
+		Num:          cfg.methodSets[method.GoName],
 		Comment:      comment,
 
-		Request:  gen.QualifiedGoIdent(method.Input.GoIdent),
+		Request:  g.QualifiedGoIdent(method.Input.GoIdent),
 		Response: response,
-		Reply:    gen.QualifiedGoIdent(method.Output.GoIdent),
+		Reply:    g.QualifiedGoIdent(method.Output.GoIdent),
 
 		Path:   route,
 		Method: rule.Method,
@@ -224,14 +224,14 @@ func buildMethodDesc(gen *parser.GeneratedFile, method *protogen.Method, rule *p
 	}, nil
 }
 
-func buildMethodCommend(method *protogen.Method) string {
+func buildMethodComment(method *protogen.Method) string {
 	return formatMethodComment(string(method.Desc.Name()), string(method.Comments.Leading))
 }
 
 // warn reports a generation warning. When failOnWarn is enabled the warning is
 // promoted to a hard error so the caller (buf generate) fails; otherwise it is
 // printed to stderr and generation continues with the pre-existing behavior.
-func (c *genConfig) warn(format string, args ...any) error {
+func (c *fileConfig) warn(format string, args ...any) error {
 	if c.failOnWarn {
 		return fmt.Errorf(format, args...)
 	}

@@ -12,10 +12,10 @@ import (
 	httpz "github.com/go-sphere/sphere/server/httpz"
 )
 
-var _ = (*context.Context)(nil)
-var _ = (*httpx.Router)(nil)
-var _ = (*httpz.ErrorResponse)(nil)
-var _ = (*sharedv1.TestEnum)(nil)
+var _ = new(context.Context)
+var _ = new(httpx.Router)
+var _ = new(httpz.ErrorResponse)
+var _ = new(sharedv1.TestEnum)
 
 const OperationBasicServiceBodyPathTest = "/testdata.basic.v1.BasicService/BodyPathTest"
 const OperationBasicServiceRunTest = "/testdata.basic.v1.BasicService/RunTest"

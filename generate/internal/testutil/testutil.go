@@ -14,9 +14,8 @@ import (
 )
 
 // LoadDescriptorSet reads and unmarshals a FileDescriptorSet produced by
-// `protoc --descriptor_set_out=... --include_imports --include_source_info`. The
-// whole set (including dependencies, which protoc orders first) must be kept so
-// imports can be resolved later.
+// `buf build --as-file-descriptor-set`. The whole set (including dependencies,
+// which buf orders first) must be kept so imports can be resolved later.
 func LoadDescriptorSet(t *testing.T, path string) *descriptorpb.FileDescriptorSet {
 	t.Helper()
 
@@ -37,10 +36,10 @@ func LoadDescriptorSet(t *testing.T, path string) *descriptorpb.FileDescriptorSe
 
 // MustCreatePlugin builds a real *protogen.Plugin from a descriptor set. The set
 // must include every dependency; fileToGenerate is the proto path (relative to
-// the proto_path used by protoc) that should be generated.
+// the buf module root) that should be generated.
 //
 // CompilerVersion is pinned so generated headers stay deterministic and do not
-// depend on the host protoc version (an unset version renders as "(unknown)").
+// depend on the host toolchain version (an unset version renders as "(unknown)").
 func MustCreatePlugin(t *testing.T, set *descriptorpb.FileDescriptorSet, fileToGenerate string) *protogen.Plugin {
 	t.Helper()
 
@@ -62,7 +61,7 @@ func MustCreatePlugin(t *testing.T, set *descriptorpb.FileDescriptorSet, fileToG
 }
 
 // FileToGenerate returns the single file marked for generation. Always use this
-// instead of plugin.Files[0]: with --include_imports, plugin.Files[0] is a
+// instead of plugin.Files[0]: with bundled imports, plugin.Files[0] is a
 // dependency (e.g. descriptor.proto), not the target.
 func FileToGenerate(t *testing.T, plugin *protogen.Plugin) *protogen.File {
 	t.Helper()

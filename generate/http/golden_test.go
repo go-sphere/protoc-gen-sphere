@@ -76,7 +76,7 @@ func goldenCases() []goldenCase {
 			wantFile:  false,
 		},
 		{
-			// Same proto as no_http, but with omitempty disabled so each method
+			// Same proto as no_http, but with omit-empty disabled so each method
 			// gets a default POST route.
 			name:       "default_post",
 			pbFile:     "testdata/pb/no_http.pb",
@@ -85,7 +85,7 @@ func goldenCases() []goldenCase {
 			goldenFile: "testdata/golden/default_post.sphere.pb.go",
 			config: func() *Config {
 				c := DefaultConfig()
-				c.Omitempty = false
+				c.OmitEmpty = false
 				return c
 			},
 		},

@@ -2,6 +2,7 @@ package http
 
 import (
 	"errors"
+	"fmt"
 	"strings"
 
 	"github.com/go-sphere/protoc-gen-sphere/generate/internal/template"
@@ -11,6 +12,14 @@ import (
 const (
 	defaultHTTPxPackage = "github.com/go-sphere/httpx"
 	defaultHTTPzPackage = "github.com/go-sphere/sphere/server/httpz"
+
+	// DefaultOmitEmpty controls whether methods without google.api.http rules are
+	// omitted.
+	DefaultOmitEmpty = true
+	// DefaultOmitEmptyPrefix is the route prefix for synthesized default routes.
+	DefaultOmitEmptyPrefix = ""
+	// DefaultFailOnWarn controls whether generation warnings become errors.
+	DefaultFailOnWarn = false
 
 	// DefaultSwaggerAuthHeader is the default swagger auth header comment.
 	DefaultSwaggerAuthHeader = `// @Param Authorization header string false "Bearer token"`
@@ -27,9 +36,10 @@ const (
 	DefaultServerHandlerFunc = defaultHTTPzPackage + ";WithJson"
 )
 
+// Config controls HTTP server code generation.
 type Config struct {
-	Omitempty       bool
-	OmitemptyPrefix string
+	OmitEmpty       bool
+	OmitEmptyPrefix string
 	SwaggerAuth     string
 	TemplateFile    string
 	// FailOnWarn promotes generation warnings (streaming methods that are
@@ -48,11 +58,11 @@ type Config struct {
 	ContextLoadFunc   string
 }
 
-// genConfig holds the per-file generation state derived from Config. It is
+// fileConfig holds the per-file generation state derived from Config. It is
 // internal to the package and scoped to a single generated file.
-type genConfig struct {
-	omitempty       bool
-	omitemptyPrefix string
+type fileConfig struct {
+	omitEmpty       bool
+	omitEmptyPrefix string
 	swaggerAuth     string
 	failOnWarn      bool
 	packageDesc     *template.PackageDesc
@@ -62,16 +72,40 @@ type genConfig struct {
 	methodSets map[string]int
 }
 
-// ParseGoIdent parses a "import/path;Ident" string into a protogen.GoIdent.
+// ParseGoIdent parses an "import/path;Ident" string into a protogen.GoIdent.
 func ParseGoIdent(raw string) (protogen.GoIdent, error) {
-	parts := strings.Split(raw, ";")
-	if len(parts) != 2 || parts[0] == "" || parts[1] == "" {
-		return protogen.GoIdent{}, errors.New("invalid GoIdent format, expected 'path;ident'")
+	importPath, goName, ok := strings.Cut(raw, ";")
+	if !ok || importPath == "" || goName == "" || strings.Contains(goName, ";") {
+		return protogen.GoIdent{}, errors.New("invalid GoIdent format, expected 'import/path;Ident'")
 	}
 	return protogen.GoIdent{
-		GoName:       parts[1],
-		GoImportPath: protogen.GoImportPath(parts[0]),
+		GoName:       goName,
+		GoImportPath: protogen.GoImportPath(importPath),
 	}, nil
+}
+
+// Validate checks that all required generator identifiers are configured.
+func (c *Config) Validate() error {
+	if c == nil {
+		return errors.New("config is required")
+	}
+	required := []struct {
+		name  string
+		ident protogen.GoIdent
+	}{
+		{name: "router_type", ident: c.RouterType},
+		{name: "context_type", ident: c.ContextType},
+		{name: "handler_type", ident: c.HandlerType},
+		{name: "error_resp_type", ident: c.ErrorRespType},
+		{name: "data_resp_type", ident: c.DataRespType},
+		{name: "server_handler_func", ident: c.ServerHandlerFunc},
+	}
+	for _, field := range required {
+		if field.ident.GoImportPath == "" || field.ident.GoName == "" {
+			return fmt.Errorf("%s is required (format: 'import/path;Ident')", field.name)
+		}
+	}
+	return nil
 }
 
 // DefaultConfig returns a Config populated with the plugin's default values. It
@@ -86,7 +120,9 @@ func DefaultConfig() *Config {
 		return id
 	}
 	return &Config{
-		Omitempty:         true,
+		OmitEmpty:         DefaultOmitEmpty,
+		OmitEmptyPrefix:   DefaultOmitEmptyPrefix,
+		FailOnWarn:        DefaultFailOnWarn,
 		SwaggerAuth:       DefaultSwaggerAuthHeader,
 		RouterType:        mustIdent(DefaultRouterType),
 		ContextType:       mustIdent(DefaultContextType),
