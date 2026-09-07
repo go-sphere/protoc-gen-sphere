@@ -135,6 +135,16 @@ func buildMethodDesc(g *parser.GeneratedFile, method *protogen.Method, rule *par
 			method.Parent.Location.SourceFile,
 		)
 	}
+	if parser.MidSegmentColon(route) {
+		if err := cfg.warn("method `%s.%s` route `%s` contains a literal ':' (custom-method style); gin-based routers cannot register two different such routes sharing the same path prefix. File: `%s`",
+			method.Parent.Desc.Name(),
+			method.Desc.Name(),
+			route,
+			method.Parent.Location.SourceFile,
+		); err != nil {
+			return nil, err
+		}
+	}
 	defer func() { cfg.methodSets[method.GoName]++ }()
 
 	comment := buildMethodComment(method)
@@ -215,6 +225,7 @@ func buildMethodDesc(g *parser.GeneratedFile, method *protogen.Method, rule *par
 	} else {
 		response = "*" + response
 	}
+	responseZero := goZeroValue(response)
 
 	handlerWrapper := cfg.serverHandlerFunc
 	streamType := ""
@@ -231,7 +242,10 @@ func buildMethodDesc(g *parser.GeneratedFile, method *protogen.Method, rule *par
 
 		Request:  g.QualifiedGoIdent(method.Input.GoIdent),
 		Response: response,
-		Reply:    g.QualifiedGoIdent(method.Output.GoIdent),
+		// The zero value keeps error returns compilable when response_body
+		// projects the reply onto a scalar (value-type) field.
+		ResponseZero: responseZero,
+		Reply:        g.QualifiedGoIdent(method.Output.GoIdent),
 
 		Path:   route,
 		Method: rule.Method,
@@ -256,6 +270,26 @@ func buildMethodDesc(g *parser.GeneratedFile, method *protogen.Method, rule *par
 
 func buildMethodComment(method *protogen.Method) string {
 	return formatMethodComment(string(method.Desc.Name()), string(method.Comments.Leading))
+}
+
+// goZeroValue returns the zero-value expression for a Go type expression as
+// rendered by parser.ProtoTypeToGoType: pointers, slices and maps zero to
+// nil, strings to "", bools to false, and every numeric or named enum type
+// accepts the untyped constant 0.
+func goZeroValue(goType string) string {
+	switch {
+	case strings.HasPrefix(goType, "*"),
+		strings.HasPrefix(goType, "[]"),
+		strings.HasPrefix(goType, "map["),
+		goType == "any":
+		return "nil"
+	case goType == "string":
+		return `""`
+	case goType == "bool":
+		return "false"
+	default:
+		return "0"
+	}
 }
 
 // warn reports a generation warning. When failOnWarn is enabled the warning is

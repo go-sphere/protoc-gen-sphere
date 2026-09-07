@@ -213,14 +213,11 @@ func TestSwagNoBodyPostHandlerSkipsBindJSON(t *testing.T) {
 	}
 }
 
-// TestSwagScalarResponseBodyHandlerDoesNotCompile pins the scalar response_body
-// compile bug: BUG: with response_body projected onto a scalar field the
-// handler returns a value type (e.g. (string, error)), but the template
-// unconditionally emits `return nil, err`, which is a compile error for
-// non-pointer, non-map, non-slice types. This test documents the current
-// (broken) emission; when fixed, it should assert `return "", err` (or an
-// equivalent zero value) instead.
-func TestSwagScalarResponseBodyHandlerDoesNotCompile(t *testing.T) {
+// TestSwagScalarResponseBodyHandlerCompiles covers the scalar response_body
+// fix: when response_body projects the reply onto a scalar field the handler
+// returns a value type (e.g. (string, error)), so error returns must use the
+// type's zero value instead of nil.
+func TestSwagScalarResponseBodyHandlerCompiles(t *testing.T) {
 	set := testutil.LoadDescriptorSet(t, "testdata/pb/swag_edge.pb")
 	plugin := testutil.MustCreatePlugin(t, set, "swag_edge.proto")
 	file := testutil.FileToGenerate(t, plugin)
@@ -236,26 +233,53 @@ func TestSwagScalarResponseBodyHandlerDoesNotCompile(t *testing.T) {
 	if !strings.Contains(handler, "func(ctx httpx.Context) (string, error)") {
 		t.Fatalf("expected scalar (string, error) handler signature:\n%s", handler)
 	}
-	if !strings.Contains(handler, "return nil, err") {
-		t.Errorf("BUG marker lost: the scalar response_body handler no longer emits `return nil, err` (was a compile error). Update this test to the corrected zero-value returns.")
+	if strings.Contains(handler, "return nil, err") {
+		t.Errorf("scalar response_body handler must not return nil for a value type:\n%s", handler)
+	}
+	if !strings.Contains(handler, `return "", err`) {
+		t.Errorf("scalar response_body handler should return the zero string on error:\n%s", handler)
 	}
 }
 
-// TestCustomVerbPathGenerationFails pins the custom-verb path limitation:
-// BUG: a google.api.http custom-method path such as `/v1/reports:generate` is
-// rejected outright because the `:generate` suffix is mistaken for a gin-style
-// path parameter. Expected fix: treat a trailing `:verb` literal segment as a
-// literal instead of a parameter.
-func TestCustomVerbPathGenerationFails(t *testing.T) {
+// TestCustomVerbPathTreatedAsLiteral pins the custom-verb handling: a
+// google.api.http custom-method path such as `/v1/reports:generate` is a
+// literal URL suffix, so generation succeeds, the route is registered
+// verbatim, and the Swagger router path keeps the colon (verified to serve
+// correctly on gin; gin still cannot register two different such routes
+// sharing a prefix, which the generator warns about).
+func TestCustomVerbPathTreatedAsLiteral(t *testing.T) {
 	set := testutil.LoadDescriptorSet(t, "testdata/pb/custom_verb.pb")
 	plugin := testutil.MustCreatePlugin(t, set, "custom_verb.proto")
 	file := testutil.FileToGenerate(t, plugin)
-	_, err := GenerateFile(plugin, file, DefaultConfig())
-	if err == nil {
-		t.Fatal("BUG marker lost: custom verb paths now generate successfully; update this test and parser.HTTPRouteToSwaggerRoute expectations")
+	genFile, err := GenerateFile(plugin, file, DefaultConfig())
+	if err != nil {
+		t.Fatalf("GenerateFile failed: %v", err)
 	}
-	if !strings.Contains(err.Error(), "does not match a top-level request field") {
-		t.Fatalf("unexpected error for custom verb path: %v", err)
+	content, err := genFile.Content()
+	if err != nil {
+		t.Fatalf("Content failed: %v", err)
+	}
+	generated := string(content)
+	if !strings.Contains(generated, `r.Handle("POST", "/v1/reports:generate"`) {
+		t.Errorf("custom-verb route not registered verbatim:\n%s", generated)
+	}
+	if !strings.Contains(generated, "// @Router /v1/reports:generate [post]") {
+		t.Errorf("custom-verb Swagger route lost the literal colon:\n%s", generated)
+	}
+	if strings.Contains(generated, "{generate}") {
+		t.Errorf("custom-verb suffix must not become a path variable:\n%s", generated)
+	}
+
+	// The gin multi-verb registration limitation is surfaced as a warning
+	// (a hard error under --fail_on_warn).
+	cfg := DefaultConfig()
+	cfg.FailOnWarn = true
+	_, err = GenerateFile(plugin, file, cfg)
+	if err == nil {
+		t.Fatal("expected fail_on_warn to promote the custom-verb gin warning to an error")
+	}
+	if !strings.Contains(err.Error(), "literal ':'") {
+		t.Fatalf("unexpected fail_on_warn error: %v", err)
 	}
 }
 

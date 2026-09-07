@@ -8,14 +8,18 @@ import (
 
 var (
 	// Path pattern regex compiled once at package initialization
-	complexLiteralRegex  = regexp.MustCompile(`\{([^}=]+)=([^}*]+)/(\*+)\}`)
-	literalRegex         = regexp.MustCompile(`\{([^}=]+)=([^}*/]+)\}`)
-	doubleWildcardRegex  = regexp.MustCompile(`\{([^}=]+)=\*\*\}`)
-	singleWildcardRegex  = regexp.MustCompile(`\{([^}=]+)=\*\}`)
-	simpleParamRegex     = regexp.MustCompile(`\{([^}=]+)\}`)
-	multipleSlashRegex   = regexp.MustCompile(`/+`)
-	namedParamRegex      = regexp.MustCompile(`:([a-zA-Z_][a-zA-Z0-9_]*)`)
-	wildcardParamRegex   = regexp.MustCompile(`\*([a-zA-Z_][a-zA-Z0-9_]*)`)
+	complexLiteralRegex = regexp.MustCompile(`\{([^}=]+)=([^}*]+)/(\*+)\}`)
+	literalRegex        = regexp.MustCompile(`\{([^}=]+)=([^}*/]+)\}`)
+	doubleWildcardRegex = regexp.MustCompile(`\{([^}=]+)=\*\*\}`)
+	singleWildcardRegex = regexp.MustCompile(`\{([^}=]+)=\*\}`)
+	simpleParamRegex    = regexp.MustCompile(`\{([^}=]+)\}`)
+	multipleSlashRegex  = regexp.MustCompile(`/+`)
+	// namedParamRegex matches gin-style ':name' parameters at the start of a
+	// path segment only. A colon preceded by another character — the
+	// google.api.http custom-method suffix in '/reports:generate' — is a
+	// literal part of the URL, not a parameter.
+	namedParamRegex      = regexp.MustCompile(`(^|/):([a-zA-Z_][a-zA-Z0-9_]*)`)
+	wildcardParamRegex   = regexp.MustCompile(`(^|/)\*([a-zA-Z_][a-zA-Z0-9_]*)`)
 	nonAlphanumericRegex = regexp.MustCompile(`[^a-zA-Z0-9_]`)
 )
 
@@ -103,10 +107,24 @@ func HTTPRoute(protoPath string) (string, error) {
 
 func HTTPRouteToSwaggerRoute(ginPath string) string {
 	//  :params -> {params}
-	swaggerPath := namedParamRegex.ReplaceAllString(ginPath, "{$1}")
+	swaggerPath := namedParamRegex.ReplaceAllString(ginPath, "${1}{$2}")
 	//  *filepath -> {filepath}
-	swaggerPath = wildcardParamRegex.ReplaceAllString(swaggerPath, "{$1}")
+	swaggerPath = wildcardParamRegex.ReplaceAllString(swaggerPath, "${1}{$2}")
 	return swaggerPath
+}
+
+// MidSegmentColon reports whether the route contains a ':' that does not start
+// a path segment — the google.api.http custom-method style ('/reports:generate').
+// Such colons are literals. gin-backed routers cannot register two different
+// literal-colon routes sharing the same path prefix (the tree panics), so the
+// generator warns instead of failing.
+func MidSegmentColon(route string) bool {
+	for i := 1; i < len(route); i++ {
+		if route[i] == ':' && route[i-1] != '/' {
+			return true
+		}
+	}
+	return false
 }
 
 func cleanParamName(paramName string) string {

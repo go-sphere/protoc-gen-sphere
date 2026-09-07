@@ -89,6 +89,25 @@ func goldenCases() []goldenCase {
 			goldenFile: "testdata/golden/streaming.sphere.pb.go",
 		},
 		{
+			// Swagger-annotation edge cases: no-body POST, form fields on GET,
+			// repeated wildcard path param, map/scalar/list response_body,
+			// enum and repeated-enum query params.
+			name:       "swag_edge",
+			pbFile:     "testdata/pb/swag_edge.pb",
+			protoName:  "swag_edge.proto",
+			wantFile:   true,
+			goldenFile: "testdata/golden/swag_edge.sphere.pb.go",
+		},
+		{
+			// google.api.http custom-method style paths ('/v1/reports:generate')
+			// are literal URL suffixes.
+			name:       "custom_verb",
+			pbFile:     "testdata/pb/custom_verb.pb",
+			protoName:  "custom_verb.proto",
+			wantFile:   true,
+			goldenFile: "testdata/golden/custom_verb.sphere.pb.go",
+		},
+		{
 			name:      "no_http",
 			pbFile:    "testdata/pb/no_http.pb",
 			protoName: "no_http.proto",

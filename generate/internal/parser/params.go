@@ -39,18 +39,18 @@ func URIParams(m *protogen.Method, route string) ([]ParamsField, error) {
 	var fields []ParamsField
 
 	params := make(map[string]bool)
-	// :param
+	// :param (only at segment start; a mid-segment colon is a literal)
 	namedMatches := namedParamRegex.FindAllStringSubmatch(route, -1)
 	for _, match := range namedMatches {
-		if len(match) > 1 {
-			params[match[1]] = false
+		if len(match) > 2 {
+			params[match[2]] = false
 		}
 	}
 	// *param
 	wildcardMatches := wildcardParamRegex.FindAllStringSubmatch(route, -1)
 	for _, match := range wildcardMatches {
-		if len(match) > 1 {
-			params[match[1]] = true
+		if len(match) > 2 {
+			params[match[2]] = true
 		}
 	}
 

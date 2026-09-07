@@ -63,17 +63,23 @@ func TestHTTPRouteToSwaggerRoute(t *testing.T) {
 	}
 }
 
-// TestHTTPRouteToSwaggerRouteCustomVerbPinsBug pins the custom-verb mangling:
-// BUG: the named-param regex rewrites a trailing google.api.http custom-method
-// suffix (`:generate`) as if it were a gin path parameter, so the Swagger
-// router path becomes `/v1/reports{generate}` — an undocumented path variable
-// that swag then reports as missing a @Param entry. The correct output is the
-// literal `/v1/reports:generate`.
-func TestHTTPRouteToSwaggerRouteCustomVerbPinsBug(t *testing.T) {
-	const in = "/v1/reports:generate"
-	const want = "/v1/reports{generate}" // BUG: expected "/v1/reports:generate"
-	if got := HTTPRouteToSwaggerRoute(in); got != want {
-		t.Errorf("HTTPRouteToSwaggerRoute(%q) = %q, want %q (update when the custom-verb bug is fixed)", in, got, want)
+// TestHTTPRouteToSwaggerRouteCustomVerbLiteral pins the custom-verb handling:
+// a trailing google.api.http custom-method suffix (`:generate`) is a literal
+// URL part, not a gin path parameter, so it passes through to the Swagger
+// router path unchanged. Only segment-start ':param' wildcards are rewritten.
+func TestHTTPRouteToSwaggerRouteCustomVerbLiteral(t *testing.T) {
+	tests := []struct {
+		in   string
+		want string
+	}{
+		{"/v1/reports:generate", "/v1/reports:generate"},
+		{"/v1/reports:generate/{id}", "/v1/reports:generate/{id}"},
+		{"/:id", "/{id}"},
+	}
+	for _, tt := range tests {
+		if got := HTTPRouteToSwaggerRoute(tt.in); got != tt.want {
+			t.Errorf("HTTPRouteToSwaggerRoute(%q) = %q, want %q", tt.in, got, tt.want)
+		}
 	}
 }
 

@@ -39,32 +39,32 @@ func _{{$svrType}}_{{.Name}}{{.Num}}_HTTP_Handler(srv {{$svrType}}HTTPServer) {{
 		var in {{.Request}}
 		{{- if .HasBody}}
 		if err := ctx.BindJSON(&in{{.Body}}); err != nil {
-			return nil, err
+			return {{.ResponseZero}}, err
 		}
 		{{- end}}
 		{{- if .HasHeader}}
 		if err := ctx.BindHeader(&in); err != nil {
-			return nil, err
+			return {{.ResponseZero}}, err
 		}
 		{{- end}}
 		{{- if .HasQuery}}
 		if err := ctx.BindQuery(&in); err != nil {
-			return nil, err
+			return {{.ResponseZero}}, err
 		}
 		{{- end}}
 		{{- if .HasForm}}
 		if err := ctx.BindForm(&in); err != nil {
-			return nil, err
+			return {{.ResponseZero}}, err
 		}
 		{{- end}}
 		{{- if .HasVars}}
 		if err := ctx.BindURI(&in); err != nil {
-			return nil, err
+			return {{.ResponseZero}}, err
 		}
 		{{- end}}
 		{{- if .NeedValidate}}
 		if err := {{$packageDesc.ValidateFunc}}(&in); err != nil {
-            return nil, err
+            return {{.ResponseZero}}, err
         }
         {{- end}}
 		{{- if .IsServerStream}}
@@ -75,7 +75,7 @@ func _{{$svrType}}_{{.Name}}{{.Num}}_HTTP_Handler(srv {{$svrType}}HTTPServer) {{
 		{{- else}}
 		out, err := srv.{{.Name}}(ctx{{$packageDesc.ContextLoadFunc}}, &in)
 		if err != nil {
-			return nil, err
+			return {{.ResponseZero}}, err
 		}
 		return out{{.ResponseBody}}, nil
 		{{- end}}

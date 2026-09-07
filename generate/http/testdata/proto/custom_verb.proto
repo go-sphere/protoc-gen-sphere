@@ -9,7 +9,10 @@ option go_package = "github.com/go-sphere/protoc-gen-sphere/generate/http/testda
 
 service VerbService {
   rpc GenerateReport(GenerateReportRequest) returns (GenerateReportResponse) {
-    option (google.api.http) = {post: "/v1/reports:generate"};
+    option (google.api.http) = {
+      post: "/v1/reports:generate"
+      body: "*"
+    };
   }
 }
 

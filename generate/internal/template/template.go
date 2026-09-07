@@ -46,6 +46,10 @@ type MethodDesc struct {
 	Request  string // rpc request type
 	Reply    string // rpc reply type
 	Response string // http response type
+	// ResponseZero is the zero-value expression for Response, used in error
+	// returns: "nil" for pointer/slice/map types, "" for string, "false" for
+	// bool and "0" for numeric and enum types.
+	ResponseZero string
 
 	// http_rule
 	Path   string // gin route: /api/test/:path_test1/second/:path_test
