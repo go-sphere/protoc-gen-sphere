@@ -1,0 +1,22 @@
+syntax = "proto3";
+
+package testdata.verb.v1;
+
+import "google/api/annotations.proto";
+import "sphere/binding/binding.proto";
+
+option go_package = "github.com/go-sphere/protoc-gen-sphere/generate/http/testdata/gen/verbv1;verbv1";
+
+service VerbService {
+  rpc GenerateReport(GenerateReportRequest) returns (GenerateReportResponse) {
+    option (google.api.http) = {post: "/v1/reports:generate"};
+  }
+}
+
+message GenerateReportRequest {
+  string name = 1 [(sphere.binding.location) = BINDING_LOCATION_QUERY];
+}
+
+message GenerateReportResponse {
+  bool ok = 1;
+}

@@ -63,6 +63,20 @@ func TestHTTPRouteToSwaggerRoute(t *testing.T) {
 	}
 }
 
+// TestHTTPRouteToSwaggerRouteCustomVerbPinsBug pins the custom-verb mangling:
+// BUG: the named-param regex rewrites a trailing google.api.http custom-method
+// suffix (`:generate`) as if it were a gin path parameter, so the Swagger
+// router path becomes `/v1/reports{generate}` — an undocumented path variable
+// that swag then reports as missing a @Param entry. The correct output is the
+// literal `/v1/reports:generate`.
+func TestHTTPRouteToSwaggerRouteCustomVerbPinsBug(t *testing.T) {
+	const in = "/v1/reports:generate"
+	const want = "/v1/reports{generate}" // BUG: expected "/v1/reports:generate"
+	if got := HTTPRouteToSwaggerRoute(in); got != want {
+		t.Errorf("HTTPRouteToSwaggerRoute(%q) = %q, want %q (update when the custom-verb bug is fixed)", in, got, want)
+	}
+}
+
 func TestCleanParamName(t *testing.T) {
 	tests := []struct {
 		in   string

@@ -6,14 +6,22 @@ import (
 	"strings"
 
 	validatepb "buf.build/gen/go/bufbuild/protovalidate/protocolbuffers/go/buf/validate"
+	"github.com/go-sphere/protoc-gen-sphere/generate/internal/swagspec"
 	"google.golang.org/protobuf/compiler/protogen"
 	"google.golang.org/protobuf/proto"
 )
+
+// streamSuccessDescription documents the SSE framing of a streaming response,
+// since Swagger itself has no event-stream concept.
+const streamSuccessDescription = "server-sent events stream of this message; terminated by a done or error event"
 
 type SwagParams struct {
 	Method string
 	Path   string
 	Auth   string
+	// HasBody mirrors the HTTP rule's body declaration: only a rule that
+	// declares a body may advertise one in the Swagger docs.
+	HasBody bool
 
 	PathVars   []ParamsField
 	QueryVars  []ParamsField
@@ -38,89 +46,151 @@ var NoBodyMethods = map[string]struct{}{
 	http.MethodOptions: {},
 }
 
+// BuildAnnotations synthesizes the swag annotation block for one method. It
+// builds a swagspec.Operation from the parsed proto facts and delegates both
+// validation and rendering to it, so the swag comment syntax has a single
+// owner and invalid combinations fail generation instead of producing
+// misleading docs.
 func BuildAnnotations(g *GeneratedFile, m *protogen.Method, config *SwagParams) (string, error) {
-	var builder strings.Builder
-	builder.WriteString("// @Summary " + string(m.Desc.Name()) + "\n")
-	if desc := swaggerDescription(string(m.Comments.Leading)); desc != "" {
-		builder.WriteString("// @Description " + desc + "\n")
-	}
-
-	pkgName := string(m.Parent.Desc.ParentFile().Package())
-	builder.WriteString("// @Tags " + strings.Join([]string{
-		pkgName,
-		pkgName + "." + string(m.Parent.Desc.Name()),
-	}, ",") + "\n")
-
-	if len(config.FormVars) > 0 {
-		builder.WriteString("// @Accept mpfd\n")
-	} else {
-		builder.WriteString("// @Accept json\n")
-	}
-	if config.Stream {
-		builder.WriteString("// @Produce text/event-stream\n")
-	} else {
-		builder.WriteString("// @Produce json\n")
-	}
-
-	// Add authentication if specified
-	if config.Auth != "" {
-		builder.WriteString(config.Auth + "\n")
-	}
-
-	// Add header parameters
-	for _, param := range config.HeaderVars {
-		paramType := ProtoTypeToSwaggerType(g, param.Field)
-		required := isFieldRequired(param.Field, false)
-		_, _ = fmt.Fprintf(&builder, "// @Param %s header %s %v \"%s\"\n", param.Name, paramType, required, param.Name)
-	}
-
-	// Add path parameters
-	for _, param := range config.PathVars {
-		paramType := ProtoTypeToSwaggerType(g, param.Field)
-		required := isFieldRequired(param.Field, true)
-		_, _ = fmt.Fprintf(&builder, "// @Param %s path %s %v \"%s\"\n", param.Name, paramType, required, param.Name)
-	}
-	// Add query parameters
-	for _, param := range config.QueryVars {
-		paramType := ProtoTypeToSwaggerType(g, param.Field)
-		required := isFieldRequired(param.Field, false)
-		_, _ = fmt.Fprintf(&builder, "// @Param %s query %s %v \"%s\"\n", param.Name, paramType, required, param.Name)
-	}
-	// Add form parameters
-	for _, param := range config.FormVars {
-		paramType := ProtoTypeToSwaggerType(g, param.Field)
-		required := isFieldRequired(param.Field, false)
-		_, _ = fmt.Fprintf(&builder, "// @Param %s formData %s %v \"%s\"\n", param.Name, paramType, required, param.Name)
-	}
-	// Add a request body. Skip it when the request carries form parameters:
-	// in OpenAPI 2.0 `body` and `formData` parameters are mutually exclusive,
-	// and a form-bound request has no JSON body to decode.
-	_, noBody := NoBodyMethods[config.Method]
-	if !noBody && len(config.FormVars) == 0 {
-		bodyType, err := buildSwaggerParamTypeByPath(g, m, m.Input, config.Body)
-		if err != nil {
-			return "", err
-		}
-		builder.WriteString("// @Param request body " + bodyType + " true \"request body\"\n")
-	}
-
-	// Add a response body
-	responseType, err := buildSwaggerParamTypeByPath(g, m, m.Output, config.ResponseBody)
+	op, err := buildOperation(g, m, config)
 	if err != nil {
 		return "", err
+	}
+	block, err := op.Render()
+	if err != nil {
+		return "", fmt.Errorf("method `%s.%s`: %w",
+			m.Parent.Desc.Name(), m.Desc.Name(), err)
+	}
+	return block, nil
+}
+
+func buildOperation(g *GeneratedFile, m *protogen.Method, config *SwagParams) (*swagspec.Operation, error) {
+	pkgName := string(m.Parent.Desc.ParentFile().Package())
+	op := &swagspec.Operation{
+		Summary: string(m.Desc.Name()),
+		Tags: []string{
+			pkgName,
+			pkgName + "." + string(m.Parent.Desc.Name()),
+		},
+		Accept:       "json",
+		Produce:      "json",
+		RouterPath:   config.Path,
+		RouterMethod: strings.ToLower(config.Method),
+	}
+	if desc := swaggerDescription(string(m.Comments.Leading)); desc != "" {
+		op.Description = desc
+	}
+	if strings.TrimSpace(config.Auth) != "" {
+		op.RawLines = strings.Split(strings.TrimRight(config.Auth, "\n"), "\n")
+	}
+	if config.Stream {
+		op.Produce = "text/event-stream"
+	}
+
+	addParams := func(fields []ParamsField, location swagspec.Location) {
+		for _, param := range fields {
+			op.Params = append(op.Params, swagspec.Param{
+				Name:        param.Name,
+				In:          location,
+				Type:        ProtoTypeToSwaggerParamType(g, param.Field),
+				Required:    isFieldRequired(param.Field, false),
+				Description: param.Name,
+			})
+		}
+	}
+	addParams(config.HeaderVars, swagspec.LocationHeader)
+	for _, param := range config.PathVars {
+		op.Params = append(op.Params, swagspec.Param{
+			Name:     param.Name,
+			In:       swagspec.LocationPath,
+			Type:     pathParamSwaggerType(g, param.Field),
+			Required: isFieldRequired(param.Field, true),
+			// swagspec rejects optional path params: OpenAPI 2.0 requires
+			// path parameters to be mandatory and the router cannot match
+			// the route without them anyway.
+			Description: param.Name,
+		})
+	}
+	addParams(config.QueryVars, swagspec.LocationQuery)
+
+	// Form-bound fields decode from the request payload, which only
+	// body-carrying methods have. On GET/HEAD/DELETE/OPTIONS the runtime
+	// (gin form binding) reads them from the query string, so document them
+	// as query parameters there.
+	noBody := isNoBodyMethod(config.Method)
+	formLocation := swagspec.LocationFormData
+	if noBody {
+		formLocation = swagspec.LocationQuery
+	}
+	addParams(config.FormVars, formLocation)
+
+	// Add the request body. It exists only when the rule declares one:
+	// form-bound requests have no JSON body (OpenAPI 2.0 makes body and
+	// formData mutually exclusive), and no-body methods decode nothing.
+	if config.HasBody && !noBody && len(config.FormVars) == 0 {
+		bodyType, err := buildSwaggerParamTypeByPath(g, m, m.Input, config.Body)
+		if err != nil {
+			return nil, err
+		}
+		op.Params = append(op.Params, swagspec.Param{
+			Name:        "request",
+			In:          swagspec.LocationBody,
+			Type:        bodyType,
+			Required:    true,
+			Description: "request body",
+		})
+	}
+
+	for _, param := range op.Params {
+		if param.In == swagspec.LocationFormData {
+			op.Accept = "mpfd"
+			break
+		}
+	}
+
+	// Add a response body.
+	responseType, err := buildSwaggerParamTypeByPath(g, m, m.Output, config.ResponseBody)
+	if err != nil {
+		return nil, err
 	}
 	if config.Stream {
 		// Swagger has no event-stream concept; document the per-event message
 		// type instead of pretending there is a DataResponse envelope.
-		builder.WriteString("// @Success 200 {object} " + responseType + " \"server-sent events stream of this message; terminated by a done or error event\"\n")
+		op.Success = swagspec.Response{
+			Codes:       []string{"200"},
+			Type:        responseType,
+			Description: streamSuccessDescription,
+		}
 	} else {
-		builder.WriteString("// @Success 200 {object} " + config.DataResponse + "[" + responseType + "]\n")
+		op.Success = swagspec.Response{
+			Codes: []string{"200"},
+			Type:  config.DataResponse + "[" + responseType + "]",
+		}
 	}
-	builder.WriteString("// @Failure 400,401,403,500,default {object} " + config.ErrorResponse + "\n")
+	op.Failure = swagspec.Response{
+		Codes: []string{"400", "401", "403", "500", "default"},
+		Type:  config.ErrorResponse,
+	}
+	return op, nil
+}
 
-	builder.WriteString("// @Router " + config.Path + " [" + strings.ToLower(config.Method) + "]\n")
+// pathParamSwaggerType renders the Swagger type of a single path token. URI
+// variables always arrive as one raw string token, so a repeated field
+// collapses to its element type instead of an unbindable array.
+func pathParamSwaggerType(g *GeneratedFile, field *protogen.Field) string {
+	if field.Desc.IsList() {
+		return singularSwaggerParamType(g, field)
+	}
+	return ProtoTypeToSwaggerType(g, field)
+}
 
-	return strings.TrimSpace(builder.String()), nil
+func paramRequiredOrError(param ParamsField) bool {
+	return isFieldRequired(param.Field, true)
+}
+
+func isNoBodyMethod(method string) bool {
+	_, ok := NoBodyMethods[method]
+	return ok
 }
 
 func buildSwaggerParamTypeByPath(g *GeneratedFile, m *protogen.Method, message *protogen.Message, path string) (string, error) {

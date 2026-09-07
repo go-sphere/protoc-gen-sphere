@@ -8,14 +8,12 @@ package basicv1
 import (
 	context "context"
 	httpx "github.com/go-sphere/httpx"
-	sharedv1 "github.com/go-sphere/protoc-gen-sphere/generate/http/testdata/gen/sharedv1"
 	httpz "github.com/go-sphere/sphere/server/httpz"
 )
 
 var _ = new(context.Context)
 var _ = new(httpx.Router)
 var _ = new(httpz.ErrorResponse)
-var _ = new(sharedv1.TestEnum)
 
 const OperationBasicServiceBodyPathTest = "/testdata.basic.v1.BasicService/BodyPathTest"
 const OperationBasicServiceRunTest = "/testdata.basic.v1.BasicService/RunTest"
@@ -42,7 +40,7 @@ type BasicServiceHTTPServer interface {
 // @Param path_test2 path integer true "path_test2"
 // @Param query_test1 query string false "query_test1"
 // @Param query_test2 query integer false "query_test2"
-// @Param enum_test1 query []sharedv1.TestEnum false "enum_test1"
+// @Param enum_test1 query []integer false "enum_test1"
 // @Param request body RunTestRequest true "request body"
 // @Success 200 {object} httpz.DataResponse[RunTestResponse]
 // @Failure 400,401,403,500,default {object} httpz.ErrorResponse

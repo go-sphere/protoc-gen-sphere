@@ -1,0 +1,144 @@
+syntax = "proto3";
+
+package testdata.swag.v1;
+
+import "google/api/annotations.proto";
+import "sphere/binding/binding.proto";
+
+option go_package = "github.com/go-sphere/protoc-gen-sphere/generate/http/testdata/gen/swagv1;swagv1";
+
+service SwagEdgeService {
+  // NoBodyPost declares a POST without a body: the handler never binds JSON,
+  // so the Swagger block must not advertise a request body.
+  rpc NoBodyPost(NoBodyPostRequest) returns (NoBodyPostResponse) {
+    option (google.api.http) = {post: "/api/swag/post"};
+  }
+
+  // GetWithForm binds fields as form data on a GET request.
+  rpc GetWithForm(GetWithFormRequest) returns (GetWithFormResponse) {
+    option (google.api.http) = {get: "/api/swag/form"};
+  }
+
+  // WildcardList binds a repeated string to a catch-all path segment.
+  rpc WildcardList(WildcardListRequest) returns (WildcardListResponse) {
+    option (google.api.http) = {get: "/api/swag/repeated/{names=**}"};
+  }
+
+  // MapBody projects the request body onto a map field.
+  rpc MapBody(MapBodyRequest) returns (MapBodyResponse) {
+    option (google.api.http) = {
+      post: "/api/swag/map"
+      body: "attrs"
+    };
+  }
+
+  // ScalarResponseBody projects the response onto a scalar string field.
+  rpc ScalarResponseBody(ScalarResponseBodyRequest) returns (ScalarResponseBodyResponse) {
+    option (google.api.http) = {
+      get: "/api/swag/scalar-response"
+      response_body: "token"
+    };
+  }
+
+  // MapResponseBody projects the response onto a map field.
+  rpc MapResponseBody(MapResponseBodyRequest) returns (MapResponseBodyResponse) {
+    option (google.api.http) = {
+      get: "/api/swag/map-response"
+      response_body: "labels"
+    };
+  }
+
+  // ListResponseBody projects the response onto a repeated message field.
+  rpc ListResponseBody(ListResponseBodyRequest) returns (ListResponseBodyResponse) {
+    option (google.api.http) = {
+      get: "/api/swag/list-response"
+      response_body: "items"
+    };
+  }
+
+  // EnumQuery binds an enum field as a query parameter.
+  rpc EnumQuery(EnumQueryRequest) returns (EnumQueryResponse) {
+    option (google.api.http) = {get: "/api/swag/enum"};
+  }
+
+  // EnumListQuery binds a repeated enum as a query parameter. swag only
+  // accepts primitive arrays in parameters, so the elements must render as
+  // their underlying scalar.
+  rpc EnumListQuery(EnumListQueryRequest) returns (EnumQueryResponse) {
+    option (google.api.http) = {get: "/api/swag/enum-list"};
+  }
+}
+
+message NoBodyPostRequest {
+  string name = 1 [(sphere.binding.location) = BINDING_LOCATION_QUERY];
+}
+
+message NoBodyPostResponse {
+  bool ok = 1;
+}
+
+message GetWithFormRequest {
+  string upload_name = 1 [(sphere.binding.location) = BINDING_LOCATION_FORM];
+  int64 upload_size = 2 [(sphere.binding.location) = BINDING_LOCATION_FORM];
+}
+
+message GetWithFormResponse {
+  bool ok = 1;
+}
+
+message WildcardListRequest {
+  repeated string names = 1 [(sphere.binding.location) = BINDING_LOCATION_URI];
+}
+
+message WildcardListResponse {
+  bool ok = 1;
+}
+
+message MapBodyRequest {
+  map<string, string> attrs = 1;
+}
+
+message MapBodyResponse {
+  bool ok = 1;
+}
+
+message ScalarResponseBodyRequest {
+  string filter = 1 [(sphere.binding.location) = BINDING_LOCATION_QUERY];
+}
+
+message ScalarResponseBodyResponse {
+  string token = 1;
+}
+
+message MapResponseBodyRequest {}
+
+message MapResponseBodyResponse {
+  map<string, string> labels = 1;
+}
+
+message ListResponseBodyRequest {}
+
+message ListResponseBodyResponse {
+  repeated EdgeItem items = 1;
+}
+
+message EdgeItem {
+  string id = 1;
+}
+
+message EnumQueryRequest {
+  EdgeStatus status = 1 [(sphere.binding.location) = BINDING_LOCATION_QUERY];
+}
+
+message EnumQueryResponse {
+  bool ok = 1;
+}
+
+message EnumListQueryRequest {
+  repeated EdgeStatus statuses = 1 [(sphere.binding.location) = BINDING_LOCATION_QUERY];
+}
+
+enum EdgeStatus {
+  EDGE_STATUS_UNSPECIFIED = 0;
+  EDGE_STATUS_ON = 1;
+}

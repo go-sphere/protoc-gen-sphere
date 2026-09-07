@@ -104,6 +104,23 @@ func ProtoTypeToSwaggerType(g *GeneratedFile, field *protogen.Field) string {
 	}
 }
 
+// ProtoTypeToSwaggerParamType returns the Swagger type for a single-token
+// parameter (query/header/formData). swag only accepts primitive arrays in
+// parameters, so arrays of enum or well-known-wrapper elements collapse to
+// arrays of their underlying scalar (e.g. []sharedv1.TestEnum -> []integer).
+func ProtoTypeToSwaggerParamType(g *GeneratedFile, field *protogen.Field) string {
+	if field.Desc.IsList() {
+		if scalar, ok := wellKnownSwaggerScalar(field); ok {
+			return "[]" + scalar
+		}
+		if field.Desc.Kind() == protoreflect.EnumKind {
+			return "[]integer"
+		}
+		return "[]" + singularSwaggerParamType(g, field)
+	}
+	return ProtoTypeToSwaggerType(g, field)
+}
+
 func singularSwaggerParamType(g *GeneratedFile, field *protogen.Field) string {
 	switch field.Desc.Kind() {
 	case protoreflect.BoolKind:

@@ -276,6 +276,14 @@ func main() {
 - **Route Constants**: Generates operation constants and endpoint arrays for easy reference
 - **Server Streaming (SSE)**: `rpc Watch(Req) returns (stream Resp)` generates a Server-Sent Events endpoint
 
+Swagger annotations are synthesized through a typed intermediate representation
+(`generate/internal/swagspec`) that validates each operation before rendering:
+a POST/PUT/PATCH without a declared `body` documents no request body, form-bound
+fields on GET/DELETE/HEAD/OPTIONS are documented as query parameters (matching
+the runtime binding), and parameter arrays stay within swag's primitive-array
+grammar — repeated enums render as `[]integer` so the docs never depend on swag
+being able to resolve the enum's Go package.
+
 ## Server-Streaming Methods
 
 A method declared with a `stream` reply generates an SSE handler instead of a

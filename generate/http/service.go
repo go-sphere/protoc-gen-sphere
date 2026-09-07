@@ -178,6 +178,7 @@ func buildMethodDesc(g *parser.GeneratedFile, method *protogen.Method, rule *par
 		Method:        rule.Method,
 		Path:          parser.HTTPRouteToSwaggerRoute(route),
 		Auth:          cfg.swaggerAuth,
+		HasBody:       rule.HasBody,
 		PathVars:      vars,
 		QueryVars:     queries,
 		FormVars:      forms,
