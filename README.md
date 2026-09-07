@@ -25,7 +25,7 @@ The behavior of `protoc-gen-sphere` can be customized with the following paramet
 | `version`             | Print the current plugin version and exit.                                                                            | `false`                                                     |
 | `omitempty`           | Omit file generation for files whose methods have no `google.api.http` option.                                        | `true`                                                      |
 | `omitempty_prefix`    | A file path prefix. When set, `omitempty` only applies to files with this prefix.                                     | `""`                                                        |
-| `fail_on_warn`        | Treat generation warnings (skipped streaming methods, GET/DELETE declaring a body, missing body) as hard errors.     | `false`                                                     |
+| `fail_on_warn`        | Treat generation warnings (skipped client/bidirectional streams, ignored streaming `response_body`, invalid body declarations) as hard errors. | `false`                                        |
 | `template_file`       | Path to a custom Go template file. When empty the embedded default template is used.                                 | `""`                                                        |
 | `swagger_auth_header` | The comment injected as the authorization header in generated Swagger documentation.                                 | `// @Param Authorization header string false "Bearer token"` |
 | `router_type`         | Fully qualified Go type for the router.                                                                               | `github.com/go-sphere/httpx;Router`                         |
@@ -290,17 +290,53 @@ rpc Chat(ChatRequest) returns (stream ChatResponse) {
 }
 ```
 
-The generated server interface takes a push callback; return `nil` to end the
-stream with a terminal `done` event, or an error to end it with an `error`
-event (errors before the first send still produce a plain JSON error status):
+The generated server interface takes a push callback:
 
 ```go
 Chat(ctx context.Context, req *ChatRequest, send func(*ChatResponse) error) error
 ```
 
-Each sent message is delivered as one SSE `data:` event encoded with the same
-JSON encoding as unary responses. Request binding and validation run before
-the stream commits, so those failures return regular 4xx JSON errors.
+Implement it as a producer and stop as soon as the context is canceled or
+`send` returns an error:
+
+```go
+func (s *chatService) Chat(
+    ctx context.Context,
+    req *ChatRequest,
+    send func(*ChatResponse) error,
+) error {
+    for _, delta := range tokenize(req.Prompt) {
+        select {
+        case <-ctx.Done():
+            return ctx.Err()
+        default:
+        }
+        if err := send(&ChatResponse{Delta: delta}); err != nil {
+            return err
+        }
+    }
+    return nil
+}
+```
+
+With the default `httpz.WithSSE` wrapper, every sent message is delivered as
+an unnamed SSE `data:` event using the same JSON encoding as unary responses.
+A successful stream ends with a `done` event; a failure after the stream is
+committed ends with an `error` event containing the standard `ErrorResponse`:
+
+```text
+data: {"delta":"hello"}
+
+event: done
+data: {}
+
+```
+
+Request binding and validation run in the prepare phase, before the stream
+commits, so those failures return regular JSON error statuses. After the stream
+commits, the default wrapper keeps it alive with comment frames. Producers must
+not write through `httpx.Context`; only capture the standard `context.Context`,
+the bound request, and ordinary dependencies.
 
 Notes:
 
@@ -308,12 +344,22 @@ Notes:
   skipped with a warning (an error with `fail_on_warn`).
 - `response_body` is ignored on streaming methods (warned): events carry whole
   reply messages.
+- A producer error before the first message can still become a regular JSON
+  error response. After the first message, the HTTP status is already 200 and
+  the failure is represented by the terminal `error` event.
+- The default wrapper commits lazily on the first message. For a push endpoint
+  that may wait indefinitely before sending, provide a custom
+  `stream_handler_func` that calls `httpz.WithSSE` with
+  `httpz.WithSSEEagerCommit()`.
+- Browser `EventSource` only opens GET requests. Use a streaming `fetch` client
+  (or another SSE parser) for POST-based streams such as the chat example.
 - If the same proto is also compiled with `protoc-gen-go-grpc`, that plugin
   generates a genuine gRPC streaming stub for the method — usually the desired
   behavior, but the two transports are independent.
-- To let clients resume with `Last-Event-ID`, bind the header as a regular
-  request field (`BINDING_LOCATION_HEADER`); event IDs and resume semantics
-  are the service implementation's responsibility.
+- The default `httpz.WithSSE` wrapper does not emit SSE `id:` fields. If resume
+  is required, define cursor semantics in the reply, bind `Last-Event-ID` (or a
+  query cursor) into the request, and use a custom `stream_handler_func` when
+  transport-level SSE IDs are required.
 
 ## HTTP Annotations Support
 
