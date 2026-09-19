@@ -184,10 +184,6 @@ func pathParamSwaggerType(g *GeneratedFile, field *protogen.Field) string {
 	return ProtoTypeToSwaggerType(g, field)
 }
 
-func paramRequiredOrError(param ParamsField) bool {
-	return isFieldRequired(param.Field, true)
-}
-
 func isNoBodyMethod(method string) bool {
 	_, ok := NoBodyMethods[method]
 	return ok
