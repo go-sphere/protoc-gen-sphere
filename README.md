@@ -23,8 +23,8 @@ The behavior of `protoc-gen-sphere` can be customized with the following paramet
 | Flag                  | Description                                                                                                             | Default                                                     |
 |-----------------------|-----------------------------------------------------------------------------------------------------------------------|-------------------------------------------------------------|
 | `version`             | Print the current plugin version and exit.                                                                            | `false`                                                     |
-| `omitempty`           | Omit file generation for files whose methods have no `google.api.http` option.                                        | `true`                                                      |
-| `omitempty_prefix`    | A file path prefix. When set, `omitempty` only applies to files with this prefix.                                     | `""`                                                        |
+| `omitempty`           | Skip methods without a `google.api.http` rule instead of synthesizing a default `POST` route for them; a file whose services all lack a rule emits nothing. | `true`                                                      |
+| `omitempty_prefix`    | Path prefix for synthesized default routes (`<prefix>/<fully.qualified.Service>/<Method>`, also used when a rule declares no path). | `""`                                                        |
 | `fail_on_warn`        | Treat generation warnings (skipped client/bidirectional streams, ignored streaming `response_body`, invalid body declarations) as hard errors. | `false`                                        |
 | `template_file`       | Path to a custom Go template file. When empty the embedded default template is used.                                 | `""`                                                        |
 | `swagger_auth_header` | The comment injected as the authorization header in generated Swagger documentation.                                 | `// @Param Authorization header string false "Bearer token"` |
@@ -378,6 +378,7 @@ The plugin supports the following Google API HTTP annotations:
 - `response_body`: Specifies the response body field
 - Path parameters: `{field_name}` in the URL path
 - Additional bindings: Multiple HTTP rules for the same RPC
+- Custom verbs: a `:verb` suffix on the last path segment (e.g. `post: "/v1/reports:generate"`) is kept as a literal part of the route; only a segment-leading `:` is treated as a gin-style parameter
 
 ## Binding Locations
 
