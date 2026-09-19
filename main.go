@@ -9,13 +9,13 @@ import (
 	"google.golang.org/protobuf/types/pluginpb"
 )
 
-const version = "0.0.4"
+const version = "0.0.5"
 
 var (
 	showVersion = flag.Bool("version", false, "print the version and exit")
 
 	omitEmpty       = flag.Bool("omitempty", http.DefaultOmitEmpty, "omit if google.api is empty")
-	omitEmptyPrefix = flag.String("omitempty_prefix", http.DefaultOmitEmptyPrefix, "omit if google.api is empty")
+	omitEmptyPrefix = flag.String("omitempty_prefix", http.DefaultOmitEmptyPrefix, "path prefix for synthesized default routes")
 	failOnWarn      = flag.Bool("fail_on_warn", http.DefaultFailOnWarn, "treat generation warnings (streaming skips, GET/DELETE body, missing body) as hard errors")
 
 	templateFile      = flag.String("template_file", "", "template file, if not set, use default template")
