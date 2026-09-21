@@ -135,11 +135,16 @@ func buildMethodDesc(g *parser.GeneratedFile, method *protogen.Method, rule *par
 			method.Parent.Location.SourceFile,
 		)
 	}
-	if parser.MidSegmentColon(route) {
-		if err := cfg.warn("method `%s.%s` route `%s` contains a literal ':' (custom-method style); gin-based routers cannot register two different such routes sharing the same path prefix. File: `%s`",
+	// httpx promises three path shapes and nothing else; anything outside them
+	// is unspecified, and the five adapters disagree about it. Warn rather than
+	// reject: the upstream policy is "no restriction, and no promise", so the
+	// route is still emitted exactly as converted.
+	for _, v := range parser.RouteViolations(route) {
+		if err := cfg.warn("method `%s.%s` route `%s` is outside the route grammar httpx promises: %s. File: `%s`",
 			method.Parent.Desc.Name(),
 			method.Desc.Name(),
 			route,
+			v.Detail,
 			method.Parent.Location.SourceFile,
 		); err != nil {
 			return nil, err

@@ -45,9 +45,10 @@ type Config struct {
 	SwaggerAuth     string
 	TemplateFile    string
 	// FailOnWarn promotes generation warnings (streaming methods that are
-	// skipped, GET/DELETE requests declaring a body, missing body declarations)
-	// into hard errors so `buf generate` fails instead of silently emitting a
-	// partial result. Defaults to false to preserve existing behavior.
+	// skipped, GET/DELETE requests declaring a body, missing body declarations,
+	// routes outside the path grammar httpx promises) into hard errors so
+	// `buf generate` fails instead of silently emitting a partial result.
+	// Defaults to false to preserve existing behavior.
 	FailOnWarn bool
 
 	RouterType    protogen.GoIdent

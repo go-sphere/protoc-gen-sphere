@@ -113,20 +113,6 @@ func HTTPRouteToSwaggerRoute(ginPath string) string {
 	return swaggerPath
 }
 
-// MidSegmentColon reports whether the route contains a ':' that does not start
-// a path segment — the google.api.http custom-method style ('/reports:generate').
-// Such colons are literals. gin-backed routers cannot register two different
-// literal-colon routes sharing the same path prefix (the tree panics), so the
-// generator warns instead of failing.
-func MidSegmentColon(route string) bool {
-	for i := 1; i < len(route); i++ {
-		if route[i] == ':' && route[i-1] != '/' {
-			return true
-		}
-	}
-	return false
-}
-
 func cleanParamName(paramName string) string {
 	cleaned := strings.ReplaceAll(paramName, ".", "_")
 	cleaned = nonAlphanumericRegex.ReplaceAllString(cleaned, "_")

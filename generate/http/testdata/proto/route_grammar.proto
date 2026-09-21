@@ -1,0 +1,62 @@
+syntax = "proto3";
+
+package testdata.grammar.v1;
+
+import "google/api/annotations.proto";
+import "sphere/binding/binding.proto";
+
+option go_package = "github.com/go-sphere/protoc-gen-sphere/generate/http/testdata/gen/grammarv1;grammarv1";
+
+// GrammarService collects google.api.http patterns that convert to routes
+// outside the path grammar httpx promises (a static segment, a `:name`
+// parameter filling one segment, and a single trailing `*name` wildcard).
+// Each method warns at generation time and is still emitted unchanged: httpx
+// puts no restriction on these paths, so neither does this plugin.
+service GrammarService {
+  // NonFinalWildcard converts to /v1/grammar/*path/more. The wildcard is not
+  // the final segment, so every httpx adapter panics at registration — a
+  // build-time mistake that would otherwise surface as a startup crash.
+  rpc NonFinalWildcard(NonFinalWildcardRequest) returns (GrammarResponse) {
+    option (google.api.http) = {get: "/v1/grammar/{path=**}/more"};
+  }
+
+  // TwoWildcards converts to /v1/grammar/*a/x/*b. A route may hold one
+  // wildcard, so this also panics at registration on every adapter.
+  rpc TwoWildcards(TwoWildcardsRequest) returns (GrammarResponse) {
+    option (google.api.http) = {get: "/v1/grammar/{a=**}/x/{b=**}"};
+  }
+
+  // ColonAfterParam converts to /v1/grammar/users/:id:activate. No adapter
+  // serves it as written: two panic at registration and the rest capture a
+  // parameter the generated handler never asks for.
+  rpc ColonAfterParam(ColonAfterParamRequest) returns (GrammarResponse) {
+    option (google.api.http) = {get: "/v1/grammar/users/{id}:activate"};
+  }
+
+  // ColonAfterWildcard converts to /v1/grammar/files/*path:archive, where the
+  // wildcard is named `path:archive` and `path` is unreachable.
+  rpc ColonAfterWildcard(ColonAfterWildcardRequest) returns (GrammarResponse) {
+    option (google.api.http) = {get: "/v1/grammar/files/{path=**}:archive"};
+  }
+}
+
+message NonFinalWildcardRequest {
+  string path = 1 [(sphere.binding.location) = BINDING_LOCATION_URI];
+}
+
+message TwoWildcardsRequest {
+  string a = 1 [(sphere.binding.location) = BINDING_LOCATION_URI];
+  string b = 2 [(sphere.binding.location) = BINDING_LOCATION_URI];
+}
+
+message ColonAfterParamRequest {
+  string id = 1 [(sphere.binding.location) = BINDING_LOCATION_URI];
+}
+
+message ColonAfterWildcardRequest {
+  string path = 1 [(sphere.binding.location) = BINDING_LOCATION_URI];
+}
+
+message GrammarResponse {
+  bool ok = 1;
+}

@@ -25,7 +25,7 @@ The behavior of `protoc-gen-sphere` can be customized with the following paramet
 | `version`             | Print the current plugin version and exit.                                                                            | `false`                                                     |
 | `omitempty`           | Skip methods without a `google.api.http` rule instead of synthesizing a default `POST` route for them; a file whose services all lack a rule emits nothing. | `true`                                                      |
 | `omitempty_prefix`    | Path prefix for synthesized default routes (`<prefix>/<fully.qualified.Service>/<Method>`, also used when a rule declares no path). | `""`                                                        |
-| `fail_on_warn`        | Treat generation warnings (skipped client/bidirectional streams, ignored streaming `response_body`, invalid body declarations) as hard errors. | `false`                                        |
+| `fail_on_warn`        | Treat generation warnings (skipped client/bidirectional streams, ignored streaming `response_body`, invalid body declarations, routes outside the httpx path grammar) as hard errors. | `false`                                        |
 | `template_file`       | Path to a custom Go template file. When empty the embedded default template is used.                                 | `""`                                                        |
 | `swagger_auth_header` | The comment injected as the authorization header in generated Swagger documentation.                                 | `// @Param Authorization header string false "Bearer token"` |
 | `router_type`         | Fully qualified Go type for the router.                                                                               | `github.com/go-sphere/httpx;Router`                         |
@@ -378,7 +378,35 @@ The plugin supports the following Google API HTTP annotations:
 - `response_body`: Specifies the response body field
 - Path parameters: `{field_name}` in the URL path
 - Additional bindings: Multiple HTTP rules for the same RPC
-- Custom verbs: a `:verb` suffix on the last path segment (e.g. `post: "/v1/reports:generate"`) is kept as a literal part of the route; only a segment-leading `:` is treated as a gin-style parameter
+- Custom verbs: a `:verb` suffix on the last path segment (e.g. `post: "/v1/reports:generate"`) is kept as a literal part of the route; only a segment-leading `:` is treated as a gin-style parameter (see [Route grammar warnings](#route-grammar-warnings))
+
+## Route grammar warnings
+
+`httpx` promises exactly three path shapes — a static segment, a `:name`
+parameter filling one segment, and a single `*name` wildcard as the **final**
+segment — and `stdx` is the reference implementation. Anything else gets no
+restriction and no promise: it may panic at registration, match requests it
+should not, or collide with a sibling route, and the five adapters disagree
+about which. The contract is stated on `httpx.Registrar` and enforced for
+wildcards by `httpx.ValidateWildcardPath`.
+
+Some `google.api.http` patterns convert to routes outside that grammar, so the
+generator warns about every one it emits and names the consequence. It does not
+refuse: the route is generated unchanged, mirroring the upstream policy. Set
+`fail_on_warn` to turn the warnings into build failures.
+
+| Converted route | What happens |
+|-----------------|--------------|
+| `/v1/*path/more`, `/v1/*a/x/*b` | A wildcard that is not final, or a second wildcard: **every adapter panics at registration**. |
+| `/v1/files/*` | An unnamed wildcard: every adapter panics at registration. |
+| `/v1/users/:id:activate` | A colon after a parameter: `ginx` and `hertzx` panic at registration, `echox` and `stdx` capture one parameter named `id:activate`, `fiberx` splits the segment in two. No adapter serves it as written. |
+| `/v1/files/*path:archive` | A colon after a wildcard: `ginx` panics at registration, and the other four name the wildcard `path:archive`, so `path` is unreachable. |
+| `/v1/reports:generate` | A colon after a static segment: `stdx` matches it literally; `ginx`, `echox`, `fiberx` and `hertzx` read `:generate` as a parameter, so `/v1/reportsXYZ` matches too. Two such routes under one prefix panic on `ginx` and `hertzx` and silently collide on `echox` and `fiberx`. |
+
+The custom-method form in the last row is the one worth planning around: it is
+what `google.api.http` prescribes for custom verbs, and it is portable only on
+`stdx`. Prefer a static segment (`/v1/reports/generate`) where the route has to
+run on every adapter.
 
 ## Binding Locations
 
