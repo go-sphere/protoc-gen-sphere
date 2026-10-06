@@ -94,7 +94,7 @@ func generateFileContent(plugin *protogen.Plugin, file *protogen.File, gen *prot
 		methodSets:        make(map[string]int),
 	}
 
-	generateFileHeader(plugin, file, gen)
+	generateFileHeader(plugin, file, gen, cfg.PluginVersion)
 
 	var services []*template.ServiceDesc
 	for _, service := range file.Services {

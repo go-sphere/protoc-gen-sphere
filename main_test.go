@@ -11,6 +11,7 @@ import (
 
 func TestExtractConfig(t *testing.T) {
 	want := http.DefaultConfig()
+	want.PluginVersion = "v" + version
 	got, err := extractConfig()
 	if err != nil {
 		t.Fatalf("extractConfig() error = %v", err)

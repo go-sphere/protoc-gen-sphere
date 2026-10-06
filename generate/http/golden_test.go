@@ -15,6 +15,11 @@ import (
 
 var updateGolden = flag.Bool("update-golden", false, "update golden files")
 
+// goldenPluginVersion is injected as Config.PluginVersion for every golden
+// case so the header line it produces is pinned: bumping the plugin's release
+// version in main.go must not churn the golden files.
+const goldenPluginVersion = "v0.0.0-golden"
+
 type goldenCase struct {
 	name       string
 	pbFile     string // testdata/pb/<name>.pb
@@ -144,6 +149,7 @@ func (tt goldenCase) generate(t *testing.T) []byte {
 	if tt.config != nil {
 		cfg = tt.config()
 	}
+	cfg.PluginVersion = goldenPluginVersion
 
 	genFile, err := GenerateFile(plugin, file, cfg)
 	if err != nil {

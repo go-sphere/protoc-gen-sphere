@@ -115,6 +115,7 @@ func extractConfig() (*http.Config, error) {
 	cfg.StreamHandlerFunc = parsedStreamHandlerFunc
 	cfg.StreamType = parsedStreamType
 	cfg.ContextLoadFunc = *contextLoadFunc
+	cfg.PluginVersion = "v" + version
 	if err := cfg.Validate(); err != nil {
 		return nil, err
 	}
