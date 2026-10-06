@@ -264,6 +264,13 @@ func checkScalarBindable(m *protogen.Method, field *protogen.Field, location str
 // isScalarBindable reports whether field can be bound from a single string token
 // (query/uri/header). Maps and bytes cannot; message fields are only allowed
 // when they are well-known scalar wrappers.
+//
+// isScalarBindable, fieldKindDesc and the wellKnownSwaggerScalar allowlist are
+// mirrored by hand in protoc-gen-sphere-binding (generate/binding/tagger.go).
+// The shared fixture generate/http/testdata/proto/scalar_bindability.proto and
+// its expected table testdata/golden/scalar_bindability.golden pin the
+// decisions in both repos (TestScalarBindabilityContract). Keep them
+// byte-identical; update both.
 func isScalarBindable(field *protogen.Field) bool {
 	if field.Desc.IsMap() {
 		return false

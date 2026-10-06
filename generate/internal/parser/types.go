@@ -164,6 +164,9 @@ func singularSwaggerParamType(g *GeneratedFile, field *protogen.Field) string {
 // any other message type. The set mirrors grpc-gateway: Timestamp/Duration are
 // rendered as strings and the wrapperspb.*Value types collapse to their inner
 // scalar.
+//
+// It is also the scalar-binding allowlist (see isScalarBindable), mirrored in
+// protoc-gen-sphere-binding and guarded by the shared scalar_bindability fixture.
 func wellKnownSwaggerScalar(field *protogen.Field) (string, bool) {
 	if field.Message == nil {
 		return "", false
