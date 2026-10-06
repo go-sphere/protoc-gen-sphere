@@ -69,6 +69,7 @@ func buildServiceDesc(g *parser.GeneratedFile, service *protogen.Service, cfg *f
 			sd.Methods = append(sd.Methods, desc)
 		}
 	}
+	sd.MethodSets = template.IndexMethods(sd.Methods)
 	return sd, nil
 }
 

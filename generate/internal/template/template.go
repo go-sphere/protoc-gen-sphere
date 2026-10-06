@@ -118,12 +118,20 @@ func NewRenderer(path string) (*Renderer, error) {
 	return &Renderer{template: tmpl}, nil
 }
 
-// Execute renders a service descriptor.
-func (r *Renderer) Execute(s *ServiceDesc) (string, error) {
-	s.MethodSets = make(map[string]*MethodDesc)
-	for _, m := range s.Methods {
-		s.MethodSets[m.Name] = m
+// IndexMethods returns the MethodSets index for methods, keyed by method Name.
+// When several descriptors share a Name (e.g. additional bindings), the last
+// one wins. Descriptor builders call it so Execute stays pure rendering.
+func IndexMethods(methods []*MethodDesc) map[string]*MethodDesc {
+	sets := make(map[string]*MethodDesc, len(methods))
+	for _, m := range methods {
+		sets[m.Name] = m
 	}
+	return sets
+}
+
+// Execute renders a service descriptor. It does not modify s; callers must
+// populate MethodSets (see IndexMethods) before rendering.
+func (r *Renderer) Execute(s *ServiceDesc) (string, error) {
 	var buf strings.Builder
 	if err := r.template.Execute(&buf, s); err != nil {
 		return "", fmt.Errorf("execute template: %w", err)
