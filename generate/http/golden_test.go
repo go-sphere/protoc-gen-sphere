@@ -3,6 +3,8 @@ package http
 import (
 	"flag"
 	"fmt"
+	"go/parser"
+	"go/token"
 	"os"
 	"path/filepath"
 	"strings"
@@ -171,6 +173,7 @@ func TestGolden(t *testing.T) {
 			if content == nil {
 				t.Fatal("expected a generated file, got nil")
 			}
+			mustParseGo(t, tt.goldenFile, content)
 
 			if *updateGolden {
 				if err := os.MkdirAll(filepath.Dir(tt.goldenFile), 0o755); err != nil {
@@ -209,6 +212,16 @@ func TestGoldenDeterministic(t *testing.T) {
 				t.Errorf("non-deterministic output for %s:\n%s", tt.name, firstDiff(string(first), string(second)))
 			}
 		})
+	}
+}
+
+// mustParseGo fails the test when content is not syntactically valid Go, so a
+// template regression is reported as a syntax error rather than surfacing only
+// as a golden mismatch (or being written by -update-golden unnoticed).
+func mustParseGo(t *testing.T, name string, content []byte) {
+	t.Helper()
+	if _, err := parser.ParseFile(token.NewFileSet(), name, content, parser.ParseComments); err != nil {
+		t.Fatalf("generated file %s is not valid Go: %v", name, err)
 	}
 }
 
