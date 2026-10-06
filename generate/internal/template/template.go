@@ -6,6 +6,7 @@ import (
 	_ "embed"
 	"fmt"
 	"os"
+	"strconv"
 	"strings"
 	"text/template"
 )
@@ -111,7 +112,11 @@ func NewRenderer(path string) (*Renderer, error) {
 		}
 		source = string(raw)
 	}
-	tmpl, err := template.New("http").Parse(source)
+	// goString quotes dynamic values (paths, custom HTTP methods, operation
+	// names) into valid Go string literals (guidelines §7.3).
+	tmpl, err := template.New("http").Funcs(template.FuncMap{
+		"goString": strconv.Quote,
+	}).Parse(source)
 	if err != nil {
 		return nil, fmt.Errorf("parse template: %w", err)
 	}
