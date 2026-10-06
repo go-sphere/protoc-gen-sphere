@@ -170,8 +170,51 @@ func FormParams(m *protogen.Method) ([]ParamsField, error) {
 	return fields, nil
 }
 
+// isRealOneofMember reports whether field belongs to a real (non-synthetic)
+// oneof. Such fields bind only through the JSON body: every query/uri/header/
+// form collector skips them (see OneofBindingIssues).
 func isRealOneofMember(field *protogen.Field) bool {
 	return field.Oneof != nil && !field.Oneof.Desc.IsSynthetic()
+}
+
+// OneofBindingIssue is a binding location declared on a real oneof, or on one
+// of its member fields, that the generator cannot honor.
+type OneofBindingIssue struct {
+	// Subject names the declaring element, e.g. "oneof `kind`" or
+	// "field `text`".
+	Subject  string
+	Location bindingpb.BindingLocation
+}
+
+// OneofBindingIssues returns the non-JSON binding locations declared on
+// message's real oneofs (default_oneof_location) and their members
+// (location), in declaration order. Oneof fields bind only via the JSON body,
+// so such declarations are silently ignored by the query/uri/header/form
+// collectors; callers report them as warnings rather than errors to keep
+// existing protos generating. An explicit UNSPECIFIED or JSON declaration is
+// consistent with that contract and is not reported.
+func OneofBindingIssues(message *protogen.Message) []OneofBindingIssue {
+	var issues []OneofBindingIssue
+	add := func(subject string, opts proto.Message, ext protoreflect.ExtensionType) {
+		if !proto.HasExtension(opts, ext) {
+			return
+		}
+		loc, ok := proto.GetExtension(opts, ext).(bindingpb.BindingLocation)
+		if !ok || loc == bindingpb.BindingLocation_BINDING_LOCATION_UNSPECIFIED || loc == bindingpb.BindingLocation_BINDING_LOCATION_JSON {
+			return
+		}
+		issues = append(issues, OneofBindingIssue{Subject: subject, Location: loc})
+	}
+	for _, oneof := range message.Oneofs {
+		if oneof.Desc.IsSynthetic() {
+			continue
+		}
+		add(fmt.Sprintf("oneof `%s`", oneof.Desc.Name()), oneof.Desc.Options(), bindingpb.E_DefaultOneofLocation)
+		for _, field := range oneof.Fields {
+			add(fmt.Sprintf("field `%s`", field.Desc.Name()), field.Desc.Options(), bindingpb.E_Location)
+		}
+	}
+	return issues
 }
 
 func routeParamForField(fieldName string, params map[string]bool) (string, bool, bool) {
@@ -190,9 +233,6 @@ func routeParamForField(fieldName string, params map[string]bool) (string, bool,
 func bindingLocationOf(message *protogen.Message, field *protogen.Field) bindingpb.BindingLocation {
 	if proto.HasExtension(field.Desc.Options(), bindingpb.E_Location) {
 		return proto.GetExtension(field.Desc.Options(), bindingpb.E_Location).(bindingpb.BindingLocation)
-	}
-	if isRealOneofMember(field) && proto.HasExtension(field.Oneof.Desc.Options(), bindingpb.E_DefaultOneofLocation) {
-		return proto.GetExtension(field.Oneof.Desc.Options(), bindingpb.E_DefaultOneofLocation).(bindingpb.BindingLocation)
 	}
 	if proto.HasExtension(message.Desc.Options(), bindingpb.E_DefaultLocation) {
 		return proto.GetExtension(message.Desc.Options(), bindingpb.E_DefaultLocation).(bindingpb.BindingLocation)

@@ -25,7 +25,7 @@ The behavior of `protoc-gen-sphere` can be customized with the following paramet
 | `version`             | Print the current plugin version and exit.                                                                            | `false`                                                     |
 | `omitempty`           | Skip methods without a `google.api.http` rule instead of synthesizing a default `POST` route for them; a file whose services all lack a rule emits nothing. | `true`                                                      |
 | `omitempty_prefix`    | Path prefix for synthesized default routes (`<prefix>/<fully.qualified.Service>/<Method>`, also used when a rule declares no path). | `""`                                                        |
-| `fail_on_warn`        | Treat generation warnings (skipped client/bidirectional streams, ignored streaming `response_body`, invalid body declarations, routes outside the httpx path grammar) as hard errors. | `false`                                        |
+| `fail_on_warn`        | Treat generation warnings (skipped client/bidirectional streams, ignored streaming `response_body`, invalid body declarations, routes outside the httpx path grammar, ignored oneof binding locations) as hard errors. | `false`                                        |
 | `template_file`       | Path to a custom Go template file. When empty the embedded default template is used.                                 | `""`                                                        |
 | `swagger_auth_header` | The comment injected as the authorization header in generated Swagger documentation.                                 | `// @Param Authorization header string false "Bearer token"` |
 | `router_type`         | Fully qualified Go type for the router.                                                                               | `github.com/go-sphere/httpx;Router`                         |
@@ -422,6 +422,18 @@ Fields can be bound to different parts of the HTTP request using sphere binding 
 > wrappers `Timestamp`, `Duration` and `wrapperspb.*Value`) may use them. Marking a `map`, `bytes` or arbitrary
 > `message` field with one of these locations is a generation-time error. Use `JSON` (or `FORM` for `bytes`/files)
 > instead.
+
+### Oneof Fields
+
+Members of a `oneof` bind **only via the JSON body**. The query, URI, header and form binders skip them, so on a
+method without a body (for example `GET` or `DELETE`) a oneof member is always left at its zero value. Message-level
+`default_location` does not apply to oneof members either.
+
+Declaring a non-JSON location on a oneof (`(sphere.binding.default_oneof_location)`) or on one of its members
+(`(sphere.binding.location)`) has no effect. The plugin reports each such declaration as a generation warning (a hard
+error with `fail_on_warn=true`) and generates the file as before. To bind the value from the query string, a header or
+the path, move it out of the `oneof` into a plain (or proto3 `optional`) field. proto3 `optional` fields are not
+affected: their synthetic oneof is not a real oneof.
 
 ### Optional Fields
 

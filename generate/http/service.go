@@ -37,7 +37,13 @@ func buildServiceDesc(g *parser.GeneratedFile, service *protogen.Service, cfg *f
 			continue
 		}
 		rule, ok := proto.GetExtension(method.Desc.Options(), annotations.E_Http).(*annotations.HttpRule)
-		if rule != nil && ok {
+		hasRule := rule != nil && ok
+		if hasRule || !cfg.omitEmpty {
+			if err := warnOneofBindings(method, cfg); err != nil {
+				return nil, err
+			}
+		}
+		if hasRule {
 			for _, bind := range rule.AdditionalBindings {
 				desc, err := buildHTTPRule(g, service, method, bind, cfg)
 				if err != nil {
@@ -72,6 +78,26 @@ func buildServiceDesc(g *parser.GeneratedFile, service *protogen.Service, cfg *f
 	sd.MethodSets = template.IndexMethods(sd.Methods)
 	sd.DistinctMethods = template.DistinctMethods(sd.Methods)
 	return sd, nil
+}
+
+// warnOneofBindings reports binding locations declared on the request's real
+// oneofs or their members. Oneof fields bind only via the JSON body, so a
+// QUERY/URI/HEADER/FORM declaration there is ignored and the field stays zero
+// on requests without a body. Reported once per method (not per binding).
+func warnOneofBindings(method *protogen.Method, cfg *fileConfig) error {
+	for _, issue := range parser.OneofBindingIssues(method.Input) {
+		if err := cfg.warn("method `%s.%s` %s declares %s, but oneof fields bind only via the JSON body; the declaration is ignored. File: `%s`, Message: `%s`",
+			method.Parent.Desc.Name(),
+			method.Desc.Name(),
+			issue.Subject,
+			issue.Location,
+			method.Parent.Location.SourceFile,
+			method.Input.Desc.Name(),
+		); err != nil {
+			return err
+		}
+	}
+	return nil
 }
 
 func buildHTTPRule(g *parser.GeneratedFile, service *protogen.Service, method *protogen.Method, rule *annotations.HttpRule, cfg *fileConfig) (*template.MethodDesc, error) {
