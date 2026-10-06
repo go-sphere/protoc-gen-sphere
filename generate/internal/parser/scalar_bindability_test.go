@@ -1,8 +1,6 @@
 package parser
 
 import (
-	"bufio"
-	"bytes"
 	"fmt"
 	"os"
 	"slices"
@@ -115,16 +113,12 @@ func readScalarBindabilityTable(t *testing.T, path string) []string {
 		t.Fatalf("failed to read %s (run `make testdata` for the descriptor): %v", path, err)
 	}
 	var rows []string
-	scanner := bufio.NewScanner(bytes.NewReader(data))
-	for scanner.Scan() {
-		line := strings.TrimSpace(scanner.Text())
-		if line == "" || strings.HasPrefix(line, "#") {
+	for line := range strings.Lines(string(data)) {
+		fields := strings.Fields(line)
+		if len(fields) == 0 || strings.HasPrefix(fields[0], "#") {
 			continue
 		}
-		rows = append(rows, strings.Join(strings.Fields(line), " "))
-	}
-	if err := scanner.Err(); err != nil {
-		t.Fatalf("failed to scan %s: %v", path, err)
+		rows = append(rows, strings.Join(fields, " "))
 	}
 	return rows
 }
