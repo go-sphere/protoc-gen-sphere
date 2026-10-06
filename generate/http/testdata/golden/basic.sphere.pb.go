@@ -16,8 +16,8 @@ var _ = new(context.Context)
 var _ = new(httpx.Router)
 var _ = new(httpz.ErrorResponse)
 
-const OperationBasicServiceBodyPathTest = "/testdata.basic.v1.BasicService/BodyPathTest"
 const OperationBasicServiceRunTest = "/testdata.basic.v1.BasicService/RunTest"
+const OperationBasicServiceBodyPathTest = "/testdata.basic.v1.BasicService/BodyPathTest"
 
 var EndpointsBasicService = [...][3]string{
 	{OperationBasicServiceRunTest, "POST", "/api/test/:path_test1/second/:path_test2"},
@@ -25,11 +25,11 @@ var EndpointsBasicService = [...][3]string{
 }
 
 type BasicServiceHTTPServer interface {
+	RunTest(context.Context, *RunTestRequest) (*RunTestResponse, error)
 	// BodyPathTest test comment line1
 	// test comment line2
 	// test comment line3
 	BodyPathTest(context.Context, *BodyPathTestRequest) (*BodyPathTestResponse, error)
-	RunTest(context.Context, *RunTestRequest) (*RunTestResponse, error)
 }
 
 // @Summary RunTest

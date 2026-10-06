@@ -16,9 +16,9 @@ var _ = new(context.Context)
 var _ = new(httpx.Router)
 var _ = new(httpz.ErrorResponse)
 
+const OperationStreamServiceWatch = "/testdata.streaming.v1.StreamService/Watch"
 const OperationStreamServiceChat = "/testdata.streaming.v1.StreamService/Chat"
 const OperationStreamServiceStatus = "/testdata.streaming.v1.StreamService/Status"
-const OperationStreamServiceWatch = "/testdata.streaming.v1.StreamService/Watch"
 
 var EndpointsStreamService = [...][3]string{
 	{OperationStreamServiceWatch, "GET", "/api/stream/watch/:topic"},
@@ -27,13 +27,13 @@ var EndpointsStreamService = [...][3]string{
 }
 
 type StreamServiceHTTPServer interface {
+	// Watch Server-streaming over GET: query-bound request, SSE response, and a
+	// Last-Event-ID header for business-side resume.
+	Watch(context.Context, *WatchRequest, func(*WatchResponse) error) error
 	// Chat Server-streaming over POST with a JSON body (LLM-completion shape).
 	Chat(context.Context, *ChatRequest, func(*ChatResponse) error) error
 	// Status Unary method in the same service: both shapes must coexist.
 	Status(context.Context, *StatusRequest) (*StatusResponse, error)
-	// Watch Server-streaming over GET: query-bound request, SSE response, and a
-	// Last-Event-ID header for business-side resume.
-	Watch(context.Context, *WatchRequest, func(*WatchResponse) error) error
 }
 
 // @Summary Watch

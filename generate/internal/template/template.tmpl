@@ -3,7 +3,7 @@
 {{$svrName := .ServiceName}}
 {{$packageDesc := .Package}}
 
-{{- range .MethodSets}}
+{{- range .DistinctMethods}}
 const Operation{{$svrType}}{{.OriginalName}} = {{goString (printf "/%s/%s" $svrName .OriginalName)}}
 {{- end}}
 
@@ -14,7 +14,7 @@ var Endpoints{{.ServiceType}} = [...][3]string{
 }
 
 type {{.ServiceType}}HTTPServer interface {
-{{- range .MethodSets}}
+{{- range .DistinctMethods}}
 	{{- if ne .Comment ""}}
 	{{.Comment}}
 	{{- end}}

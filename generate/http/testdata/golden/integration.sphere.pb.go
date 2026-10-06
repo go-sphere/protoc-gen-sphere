@@ -17,8 +17,8 @@ var _ = new(httpx.Router)
 var _ = new(httpz.ErrorResponse)
 
 const OperationIntegrationServiceCreateItem = "/testdata.integration.v1.IntegrationService/CreateItem"
-const OperationIntegrationServiceListItems = "/testdata.integration.v1.IntegrationService/ListItems"
 const OperationIntegrationServiceUploadItem = "/testdata.integration.v1.IntegrationService/UploadItem"
+const OperationIntegrationServiceListItems = "/testdata.integration.v1.IntegrationService/ListItems"
 
 var EndpointsIntegrationService = [...][3]string{
 	{OperationIntegrationServiceCreateItem, "POST", "/api/tenants/:tenant_id/items"},
@@ -30,11 +30,11 @@ type IntegrationServiceHTTPServer interface {
 	// CreateItem CreateItem carries the whole request as JSON while pulling tenant_id from
 	// the path, request_id from a header and not_before from the query string.
 	CreateItem(context.Context, *CreateItemRequest) (*ItemResponse, error)
+	// UploadItem UploadItem decodes its payload from multipart form data (no JSON body).
+	UploadItem(context.Context, *UploadItemRequest) (*ItemResponse, error)
 	// ListItems ListItems exercises well-known types (Timestamp/Duration/wrappers) bound as
 	// query parameters, which must render as scalar Swagger types.
 	ListItems(context.Context, *ListItemsRequest) (*ListItemsResponse, error)
-	// UploadItem UploadItem decodes its payload from multipart form data (no JSON body).
-	UploadItem(context.Context, *UploadItemRequest) (*ItemResponse, error)
 }
 
 // @Summary CreateItem

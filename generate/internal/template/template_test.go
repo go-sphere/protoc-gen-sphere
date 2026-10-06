@@ -56,6 +56,9 @@ func TestExecuteDoesNotMutateInput(t *testing.T) {
 	if desc.MethodSets != nil {
 		t.Errorf("Execute must not populate MethodSets, got %v", desc.MethodSets)
 	}
+	if desc.DistinctMethods != nil {
+		t.Errorf("Execute must not populate DistinctMethods, got %v", desc.DistinctMethods)
+	}
 }
 
 func TestIndexMethodsLastWins(t *testing.T) {
@@ -65,5 +68,34 @@ func TestIndexMethodsLastWins(t *testing.T) {
 	sets := IndexMethods([]*MethodDesc{first, second, other})
 	if len(sets) != 2 || sets["Start"] != second || sets["Stop"] != other {
 		t.Errorf("unexpected index: %v", sets)
+	}
+}
+
+func TestDistinctMethodsDeclarationOrder(t *testing.T) {
+	// Additional bindings precede the primary rule (Start0, Start1), so the
+	// Name keeps its first position but takes the last descriptor, matching
+	// IndexMethods.
+	watch := &MethodDesc{Name: "Watch"}
+	start0 := &MethodDesc{Name: "Start", Num: 0}
+	start1 := &MethodDesc{Name: "Start", Num: 1}
+	chat := &MethodDesc{Name: "Chat"}
+	methods := []*MethodDesc{watch, start0, start1, chat}
+
+	got := DistinctMethods(methods)
+	want := []*MethodDesc{watch, start1, chat}
+	if len(got) != len(want) {
+		t.Fatalf("DistinctMethods() returned %d entries, want %d", len(got), len(want))
+	}
+	sets := IndexMethods(methods)
+	for i := range want {
+		if got[i] != want[i] {
+			t.Errorf("DistinctMethods()[%d] = %s#%d, want %s#%d", i, got[i].Name, got[i].Num, want[i].Name, want[i].Num)
+		}
+		if sets[got[i].Name] != got[i] {
+			t.Errorf("DistinctMethods()[%d] differs from IndexMethods for %s", i, got[i].Name)
+		}
+	}
+	if got := DistinctMethods(nil); len(got) != 0 {
+		t.Errorf("DistinctMethods(nil) = %v, want empty", got)
 	}
 }

@@ -30,8 +30,15 @@ type ServiceDesc struct {
 	ServiceType string // TestService
 	ServiceName string // shared.v1.TestService
 
-	Methods    []*MethodDesc
+	// Methods holds one entry per HTTP binding (additional bindings of the
+	// same rpc share a Name and differ by Num), in declaration order.
+	Methods []*MethodDesc
+	// MethodSets indexes Methods by Name (see IndexMethods). Ranging over it
+	// visits names in sorted order; kept for custom templates.
 	MethodSets map[string]*MethodDesc
+	// DistinctMethods holds one entry per Name in declaration order (see
+	// DistinctMethods), for per-rpc sections such as the server interface.
+	DistinctMethods []*MethodDesc
 
 	Package *PackageDesc
 }
@@ -134,8 +141,28 @@ func IndexMethods(methods []*MethodDesc) map[string]*MethodDesc {
 	return sets
 }
 
+// DistinctMethods returns methods de-duplicated by Name, ordered by each
+// Name's first occurrence (declaration order). Each entry is the same
+// descriptor IndexMethods selects for that Name (the last one), so ranging
+// over the result renders exactly what ranging over MethodSets does, only in
+// declaration order instead of sorted by Name.
+func DistinctMethods(methods []*MethodDesc) []*MethodDesc {
+	pos := make(map[string]int, len(methods))
+	out := make([]*MethodDesc, 0, len(methods))
+	for _, m := range methods {
+		if i, ok := pos[m.Name]; ok {
+			out[i] = m
+			continue
+		}
+		pos[m.Name] = len(out)
+		out = append(out, m)
+	}
+	return out
+}
+
 // Execute renders a service descriptor. It does not modify s; callers must
-// populate MethodSets (see IndexMethods) before rendering.
+// populate MethodSets and DistinctMethods (see IndexMethods and
+// DistinctMethods) before rendering.
 func (r *Renderer) Execute(s *ServiceDesc) (string, error) {
 	var buf strings.Builder
 	if err := r.template.Execute(&buf, s); err != nil {

@@ -16,8 +16,8 @@ var _ = new(context.Context)
 var _ = new(httpx.Router)
 var _ = new(httpz.ErrorResponse)
 
-const OperationNoBodyServiceDeleteItem = "/testdata.nobody.v1.NoBodyService/DeleteItem"
 const OperationNoBodyServiceGetItem = "/testdata.nobody.v1.NoBodyService/GetItem"
+const OperationNoBodyServiceDeleteItem = "/testdata.nobody.v1.NoBodyService/DeleteItem"
 
 var EndpointsNoBodyService = [...][3]string{
 	{OperationNoBodyServiceGetItem, "GET", "/api/items/:id"},
@@ -25,12 +25,12 @@ var EndpointsNoBodyService = [...][3]string{
 }
 
 type NoBodyServiceHTTPServer interface {
-	// DeleteItem DeleteItem declares `body: "*"` on a DELETE. The body must be ignored too;
-	// its fields are bound from the URI/query instead.
-	DeleteItem(context.Context, *DeleteItemRequest) (*DeleteItemResponse, error)
 	// GetItem GetItem declares `body: "*"` on a GET, which is invalid. The generator must
 	// drop the body and bind only the URI/query params.
 	GetItem(context.Context, *GetItemRequest) (*GetItemResponse, error)
+	// DeleteItem DeleteItem declares `body: "*"` on a DELETE. The body must be ignored too;
+	// its fields are bound from the URI/query instead.
+	DeleteItem(context.Context, *DeleteItemRequest) (*DeleteItemResponse, error)
 }
 
 // @Summary GetItem

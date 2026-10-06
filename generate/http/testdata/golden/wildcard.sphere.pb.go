@@ -16,9 +16,9 @@ var _ = new(context.Context)
 var _ = new(httpx.Router)
 var _ = new(httpz.ErrorResponse)
 
-const OperationFileServiceArchive = "/testdata.wildcard.v1.FileService/Archive"
 const OperationFileServiceDownload = "/testdata.wildcard.v1.FileService/Download"
 const OperationFileServicePreview = "/testdata.wildcard.v1.FileService/Preview"
+const OperationFileServiceArchive = "/testdata.wildcard.v1.FileService/Archive"
 
 var EndpointsFileService = [...][3]string{
 	{OperationFileServiceDownload, "GET", "/v1/files/*path"},
@@ -27,13 +27,13 @@ var EndpointsFileService = [...][3]string{
 }
 
 type FileServiceHTTPServer interface {
-	// Archive Archive uses a literal prefix with a double wildcard:
-	// /v1/archive/{path=assets/**} -> /v1/archive/assets/*path.
-	Archive(context.Context, *ArchiveRequest) (*ArchiveResponse, error)
 	// Download Download uses a bare double wildcard: /v1/files/{path=**} -> /v1/files/*path.
 	Download(context.Context, *DownloadRequest) (*DownloadResponse, error)
 	// Preview Preview uses a single wildcard: /v1/preview/{name=*} -> /v1/preview/:name.
 	Preview(context.Context, *PreviewRequest) (*PreviewResponse, error)
+	// Archive Archive uses a literal prefix with a double wildcard:
+	// /v1/archive/{path=assets/**} -> /v1/archive/assets/*path.
+	Archive(context.Context, *ArchiveRequest) (*ArchiveResponse, error)
 }
 
 // @Summary Download

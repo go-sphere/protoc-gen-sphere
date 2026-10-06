@@ -16,15 +16,15 @@ var _ = new(context.Context)
 var _ = new(httpx.Router)
 var _ = new(httpz.ErrorResponse)
 
-const OperationSwagEdgeServiceEnumListQuery = "/testdata.swag.v1.SwagEdgeService/EnumListQuery"
-const OperationSwagEdgeServiceEnumQuery = "/testdata.swag.v1.SwagEdgeService/EnumQuery"
-const OperationSwagEdgeServiceGetWithForm = "/testdata.swag.v1.SwagEdgeService/GetWithForm"
-const OperationSwagEdgeServiceListResponseBody = "/testdata.swag.v1.SwagEdgeService/ListResponseBody"
-const OperationSwagEdgeServiceMapBody = "/testdata.swag.v1.SwagEdgeService/MapBody"
-const OperationSwagEdgeServiceMapResponseBody = "/testdata.swag.v1.SwagEdgeService/MapResponseBody"
 const OperationSwagEdgeServiceNoBodyPost = "/testdata.swag.v1.SwagEdgeService/NoBodyPost"
-const OperationSwagEdgeServiceScalarResponseBody = "/testdata.swag.v1.SwagEdgeService/ScalarResponseBody"
+const OperationSwagEdgeServiceGetWithForm = "/testdata.swag.v1.SwagEdgeService/GetWithForm"
 const OperationSwagEdgeServiceWildcardList = "/testdata.swag.v1.SwagEdgeService/WildcardList"
+const OperationSwagEdgeServiceMapBody = "/testdata.swag.v1.SwagEdgeService/MapBody"
+const OperationSwagEdgeServiceScalarResponseBody = "/testdata.swag.v1.SwagEdgeService/ScalarResponseBody"
+const OperationSwagEdgeServiceMapResponseBody = "/testdata.swag.v1.SwagEdgeService/MapResponseBody"
+const OperationSwagEdgeServiceListResponseBody = "/testdata.swag.v1.SwagEdgeService/ListResponseBody"
+const OperationSwagEdgeServiceEnumQuery = "/testdata.swag.v1.SwagEdgeService/EnumQuery"
+const OperationSwagEdgeServiceEnumListQuery = "/testdata.swag.v1.SwagEdgeService/EnumListQuery"
 
 var EndpointsSwagEdgeService = [...][3]string{
 	{OperationSwagEdgeServiceNoBodyPost, "POST", "/api/swag/post"},
@@ -39,27 +39,27 @@ var EndpointsSwagEdgeService = [...][3]string{
 }
 
 type SwagEdgeServiceHTTPServer interface {
+	// NoBodyPost NoBodyPost declares a POST without a body: the handler never binds JSON,
+	// so the Swagger block must not advertise a request body.
+	NoBodyPost(context.Context, *NoBodyPostRequest) (*NoBodyPostResponse, error)
+	// GetWithForm GetWithForm binds fields as form data on a GET request.
+	GetWithForm(context.Context, *GetWithFormRequest) (*GetWithFormResponse, error)
+	// WildcardList WildcardList binds a repeated string to a catch-all path segment.
+	WildcardList(context.Context, *WildcardListRequest) (*WildcardListResponse, error)
+	// MapBody MapBody projects the request body onto a map field.
+	MapBody(context.Context, *MapBodyRequest) (*MapBodyResponse, error)
+	// ScalarResponseBody ScalarResponseBody projects the response onto a scalar string field.
+	ScalarResponseBody(context.Context, *ScalarResponseBodyRequest) (*ScalarResponseBodyResponse, error)
+	// MapResponseBody MapResponseBody projects the response onto a map field.
+	MapResponseBody(context.Context, *MapResponseBodyRequest) (*MapResponseBodyResponse, error)
+	// ListResponseBody ListResponseBody projects the response onto a repeated message field.
+	ListResponseBody(context.Context, *ListResponseBodyRequest) (*ListResponseBodyResponse, error)
+	// EnumQuery EnumQuery binds an enum field as a query parameter.
+	EnumQuery(context.Context, *EnumQueryRequest) (*EnumQueryResponse, error)
 	// EnumListQuery EnumListQuery binds a repeated enum as a query parameter. swag only
 	// accepts primitive arrays in parameters, so the elements must render as
 	// their underlying scalar.
 	EnumListQuery(context.Context, *EnumListQueryRequest) (*EnumQueryResponse, error)
-	// EnumQuery EnumQuery binds an enum field as a query parameter.
-	EnumQuery(context.Context, *EnumQueryRequest) (*EnumQueryResponse, error)
-	// GetWithForm GetWithForm binds fields as form data on a GET request.
-	GetWithForm(context.Context, *GetWithFormRequest) (*GetWithFormResponse, error)
-	// ListResponseBody ListResponseBody projects the response onto a repeated message field.
-	ListResponseBody(context.Context, *ListResponseBodyRequest) (*ListResponseBodyResponse, error)
-	// MapBody MapBody projects the request body onto a map field.
-	MapBody(context.Context, *MapBodyRequest) (*MapBodyResponse, error)
-	// MapResponseBody MapResponseBody projects the response onto a map field.
-	MapResponseBody(context.Context, *MapResponseBodyRequest) (*MapResponseBodyResponse, error)
-	// NoBodyPost NoBodyPost declares a POST without a body: the handler never binds JSON,
-	// so the Swagger block must not advertise a request body.
-	NoBodyPost(context.Context, *NoBodyPostRequest) (*NoBodyPostResponse, error)
-	// ScalarResponseBody ScalarResponseBody projects the response onto a scalar string field.
-	ScalarResponseBody(context.Context, *ScalarResponseBodyRequest) (*ScalarResponseBodyResponse, error)
-	// WildcardList WildcardList binds a repeated string to a catch-all path segment.
-	WildcardList(context.Context, *WildcardListRequest) (*WildcardListResponse, error)
 }
 
 // @Summary NoBodyPost

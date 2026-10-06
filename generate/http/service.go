@@ -70,6 +70,7 @@ func buildServiceDesc(g *parser.GeneratedFile, service *protogen.Service, cfg *f
 		}
 	}
 	sd.MethodSets = template.IndexMethods(sd.Methods)
+	sd.DistinctMethods = template.DistinctMethods(sd.Methods)
 	return sd, nil
 }
 
