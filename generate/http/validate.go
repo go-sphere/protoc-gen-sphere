@@ -38,6 +38,11 @@ func messageHasValidate(msg *protogen.Message, seen map[string]struct{}) bool {
 	if hasValidateOptionsInMessage(msg) {
 		return true
 	}
+	for _, oneof := range msg.Oneofs {
+		if proto.HasExtension(oneof.Desc.Options(), validatepb.E_Oneof) {
+			return true
+		}
+	}
 	for _, field := range msg.Fields {
 		if hasValidateOptions(field) {
 			return true

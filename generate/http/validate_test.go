@@ -29,6 +29,12 @@ func TestRequestNeedsValidateNested(t *testing.T) {
 		t.Error("nested field rules should need validate")
 	}
 
+	if msg := byName["OneofCreateRequest"]; msg == nil {
+		t.Fatal("OneofCreateRequest not found")
+	} else if !requestNeedsValidate(msg) {
+		t.Error("oneof-level rules should need validate")
+	}
+
 	if msg := byName["CreateResponse"]; msg == nil {
 		t.Fatal("CreateResponse not found")
 	} else if requestNeedsValidate(msg) {
