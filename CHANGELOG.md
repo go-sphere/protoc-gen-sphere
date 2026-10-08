@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+## v0.0.6 (2026-10-08)
+
 ### Changed
 
 - **BREAKING**: a request message that contains a real `oneof`, directly or in
