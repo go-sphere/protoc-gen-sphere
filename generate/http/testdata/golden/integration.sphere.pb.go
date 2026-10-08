@@ -8,8 +8,10 @@ package integrationv1
 
 import (
 	context "context"
+	errors "errors"
 	httpx "github.com/go-sphere/httpx"
 	httpz "github.com/go-sphere/sphere/server/httpz"
+	io "io"
 )
 
 var _ = new(context.Context)
@@ -28,24 +30,22 @@ var EndpointsIntegrationService = [...][3]string{
 
 type IntegrationServiceHTTPServer interface {
 	// CreateItem CreateItem carries the whole request as JSON while pulling tenant_id from
-	// the path, request_id from a header and not_before from the query string.
+	// the path and request_id from a header.
 	CreateItem(context.Context, *CreateItemRequest) (*ItemResponse, error)
 	// UploadItem UploadItem decodes its payload from multipart form data (no JSON body).
 	UploadItem(context.Context, *UploadItemRequest) (*ItemResponse, error)
-	// ListItems ListItems exercises well-known types (Timestamp/Duration/wrappers) bound as
-	// query parameters, which must render as scalar Swagger types.
+	// ListItems ListItems binds plain and proto3 optional scalars as query parameters.
 	ListItems(context.Context, *ListItemsRequest) (*ListItemsResponse, error)
 }
 
 // @Summary CreateItem
-// @Description CreateItem carries the whole request as JSON while pulling tenant_id from, the path, request_id from a header and not_before from the query string.
+// @Description CreateItem carries the whole request as JSON while pulling tenant_id from, the path and request_id from a header.
 // @Tags testdata.integration.v1,testdata.integration.v1.IntegrationService
 // @Accept json
 // @Produce json
 // @Param Authorization header string false "Bearer token"
 // @Param request_id header string false "request_id"
 // @Param tenant_id path string true "tenant_id"
-// @Param not_before query string false "not_before"
 // @Param request body CreateItemRequest true "request body"
 // @Success 200 {object} httpz.DataResponse[ItemResponse]
 // @Failure 400,401,403,500,default {object} httpz.ErrorResponse
@@ -53,13 +53,10 @@ type IntegrationServiceHTTPServer interface {
 func _IntegrationService_CreateItem0_HTTP_Handler(srv IntegrationServiceHTTPServer) httpx.Handler {
 	return httpz.WithJson(func(ctx httpx.Context) (*ItemResponse, error) {
 		var in CreateItemRequest
-		if err := ctx.BindJSON(&in); err != nil {
+		if err := ctx.BindJSON(&in); err != nil && !errors.Is(err, io.EOF) {
 			return nil, err
 		}
 		if err := ctx.BindHeader(&in); err != nil {
-			return nil, err
-		}
-		if err := ctx.BindQuery(&in); err != nil {
 			return nil, err
 		}
 		if err := ctx.BindURI(&in); err != nil {
@@ -103,14 +100,14 @@ func _IntegrationService_UploadItem0_HTTP_Handler(srv IntegrationServiceHTTPServ
 }
 
 // @Summary ListItems
-// @Description ListItems exercises well-known types (Timestamp/Duration/wrappers) bound as, query parameters, which must render as scalar Swagger types.
+// @Description ListItems binds plain and proto3 optional scalars as query parameters.
 // @Tags testdata.integration.v1,testdata.integration.v1.IntegrationService
 // @Accept json
 // @Produce json
 // @Param Authorization header string false "Bearer token"
 // @Param tenant_id path string true "tenant_id"
-// @Param created_after query string false "created_after"
-// @Param max_age query string false "max_age"
+// @Param created_after_unix query integer false "created_after_unix"
+// @Param max_age_seconds query integer false "max_age_seconds"
 // @Param keyword query string false "keyword"
 // @Param limit query integer false "limit"
 // @Param active query boolean false "active"

@@ -9,8 +9,10 @@ package validatev1
 import (
 	protovalidate "buf.build/go/protovalidate"
 	context "context"
+	errors "errors"
 	httpx "github.com/go-sphere/httpx"
 	httpz "github.com/go-sphere/sphere/server/httpz"
+	io "io"
 )
 
 var _ = new(context.Context)
@@ -20,18 +22,15 @@ var _ = protovalidate.Validate
 
 const OperationValidateServiceCreate = "/testdata.validate.v1.ValidateService/Create"
 const OperationValidateServiceNestedCreate = "/testdata.validate.v1.ValidateService/NestedCreate"
-const OperationValidateServiceOneofCreate = "/testdata.validate.v1.ValidateService/OneofCreate"
 
 var EndpointsValidateService = [...][3]string{
 	{OperationValidateServiceCreate, "POST", "/api/create"},
 	{OperationValidateServiceNestedCreate, "POST", "/api/nested"},
-	{OperationValidateServiceOneofCreate, "POST", "/api/oneof"},
 }
 
 type ValidateServiceHTTPServer interface {
 	Create(context.Context, *CreateRequest) (*CreateResponse, error)
 	NestedCreate(context.Context, *NestedCreateRequest) (*CreateResponse, error)
-	OneofCreate(context.Context, *OneofCreateRequest) (*CreateResponse, error)
 }
 
 // @Summary Create
@@ -46,11 +45,11 @@ type ValidateServiceHTTPServer interface {
 func _ValidateService_Create0_HTTP_Handler(srv ValidateServiceHTTPServer) httpx.Handler {
 	return httpz.WithJson(func(ctx httpx.Context) (*CreateResponse, error) {
 		var in CreateRequest
-		if err := ctx.BindJSON(&in); err != nil {
+		if err := ctx.BindJSON(&in); err != nil && !errors.Is(err, io.EOF) {
 			return nil, err
 		}
 		if err := protovalidate.Validate(&in); err != nil {
-			return nil, err
+			return nil, httpx.BadRequestError(err)
 		}
 		out, err := srv.Create(ctx.Context(), &in)
 		if err != nil {
@@ -72,39 +71,13 @@ func _ValidateService_Create0_HTTP_Handler(srv ValidateServiceHTTPServer) httpx.
 func _ValidateService_NestedCreate0_HTTP_Handler(srv ValidateServiceHTTPServer) httpx.Handler {
 	return httpz.WithJson(func(ctx httpx.Context) (*CreateResponse, error) {
 		var in NestedCreateRequest
-		if err := ctx.BindJSON(&in); err != nil {
+		if err := ctx.BindJSON(&in); err != nil && !errors.Is(err, io.EOF) {
 			return nil, err
 		}
 		if err := protovalidate.Validate(&in); err != nil {
-			return nil, err
+			return nil, httpx.BadRequestError(err)
 		}
 		out, err := srv.NestedCreate(ctx.Context(), &in)
-		if err != nil {
-			return nil, err
-		}
-		return out, nil
-	})
-}
-
-// @Summary OneofCreate
-// @Tags testdata.validate.v1,testdata.validate.v1.ValidateService
-// @Accept json
-// @Produce json
-// @Param Authorization header string false "Bearer token"
-// @Param request body OneofCreateRequest true "request body"
-// @Success 200 {object} httpz.DataResponse[CreateResponse]
-// @Failure 400,401,403,500,default {object} httpz.ErrorResponse
-// @Router /api/oneof [post]
-func _ValidateService_OneofCreate0_HTTP_Handler(srv ValidateServiceHTTPServer) httpx.Handler {
-	return httpz.WithJson(func(ctx httpx.Context) (*CreateResponse, error) {
-		var in OneofCreateRequest
-		if err := ctx.BindJSON(&in); err != nil {
-			return nil, err
-		}
-		if err := protovalidate.Validate(&in); err != nil {
-			return nil, err
-		}
-		out, err := srv.OneofCreate(ctx.Context(), &in)
 		if err != nil {
 			return nil, err
 		}
@@ -116,5 +89,4 @@ func RegisterValidateServiceHTTPServer(route httpx.Router, srv ValidateServiceHT
 	r := route.Group("/")
 	r.Handle("POST", "/api/create", _ValidateService_Create0_HTTP_Handler(srv))
 	r.Handle("POST", "/api/nested", _ValidateService_NestedCreate0_HTTP_Handler(srv))
-	r.Handle("POST", "/api/oneof", _ValidateService_OneofCreate0_HTTP_Handler(srv))
 }

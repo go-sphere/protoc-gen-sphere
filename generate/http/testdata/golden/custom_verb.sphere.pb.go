@@ -32,16 +32,12 @@ type VerbServiceHTTPServer interface {
 // @Produce json
 // @Param Authorization header string false "Bearer token"
 // @Param name query string false "name"
-// @Param request body GenerateReportRequest true "request body"
 // @Success 200 {object} httpz.DataResponse[GenerateReportResponse]
 // @Failure 400,401,403,500,default {object} httpz.ErrorResponse
 // @Router /v1/reports:generate [post]
 func _VerbService_GenerateReport0_HTTP_Handler(srv VerbServiceHTTPServer) httpx.Handler {
 	return httpz.WithJson(func(ctx httpx.Context) (*GenerateReportResponse, error) {
 		var in GenerateReportRequest
-		if err := ctx.BindJSON(&in); err != nil {
-			return nil, err
-		}
 		if err := ctx.BindQuery(&in); err != nil {
 			return nil, err
 		}

@@ -113,16 +113,10 @@ func buildOperation(g *GeneratedFile, m *protogen.Method, config *SwagParams) (*
 	}
 	addParams(config.QueryVars, swagspec.LocationQuery)
 
-	// Form-bound fields decode from the request payload, which only
-	// body-carrying methods have. On GET/HEAD/DELETE/OPTIONS the runtime
-	// (gin form binding) reads them from the query string, so document them
-	// as query parameters there.
+	// QueryParams rejects form fields on GET/HEAD/DELETE/OPTIONS, so form
+	// fields only reach here on body-carrying methods.
 	noBody := isNoBodyMethod(config.Method)
-	formLocation := swagspec.LocationFormData
-	if noBody {
-		formLocation = swagspec.LocationQuery
-	}
-	addParams(config.FormVars, formLocation)
+	addParams(config.FormVars, swagspec.LocationFormData)
 
 	// Add the request body. It exists only when the rule declares one:
 	// form-bound requests have no JSON body (OpenAPI 2.0 makes body and

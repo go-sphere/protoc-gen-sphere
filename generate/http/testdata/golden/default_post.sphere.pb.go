@@ -8,8 +8,10 @@ package nohttpv1
 
 import (
 	context "context"
+	errors "errors"
 	httpx "github.com/go-sphere/httpx"
 	httpz "github.com/go-sphere/sphere/server/httpz"
+	io "io"
 )
 
 var _ = new(context.Context)
@@ -38,7 +40,7 @@ type NoHTTPServiceHTTPServer interface {
 func _NoHTTPService_Ping0_HTTP_Handler(srv NoHTTPServiceHTTPServer) httpx.Handler {
 	return httpz.WithJson(func(ctx httpx.Context) (*PingResponse, error) {
 		var in PingRequest
-		if err := ctx.BindJSON(&in); err != nil {
+		if err := ctx.BindJSON(&in); err != nil && !errors.Is(err, io.EOF) {
 			return nil, err
 		}
 		out, err := srv.Ping(ctx.Context(), &in)

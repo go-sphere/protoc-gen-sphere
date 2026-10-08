@@ -25,7 +25,7 @@ The behavior of `protoc-gen-sphere` can be customized with the following paramet
 | `version`             | Print the current plugin version and exit.                                                                            | `false`                                                     |
 | `omitempty`           | Skip methods without a `google.api.http` rule instead of synthesizing a default `POST` route for them; a file whose services all lack a rule emits nothing. | `true`                                                      |
 | `omitempty_prefix`    | Path prefix for synthesized default routes (`<prefix>/<fully.qualified.Service>/<Method>`, also used when a rule declares no path). | `""`                                                        |
-| `fail_on_warn`        | Treat generation warnings (skipped client/bidirectional streams, ignored streaming `response_body`, invalid body declarations, routes outside the httpx path grammar, ignored oneof binding locations) as hard errors. | `false`                                        |
+| `fail_on_warn`        | Treat generation warnings (skipped client/bidirectional streams, ignored streaming `response_body`, invalid body declarations, request fields left unbound by a `body: "field"` selector, routes outside the httpx path grammar) as hard errors. | `false`                                        |
 | `template_file`       | Path to a custom Go template file. When empty the embedded default template is used.                                 | `""`                                                        |
 | `swagger_auth_header` | The comment injected as the authorization header in generated Swagger documentation.                                 | `// @Param Authorization header string false "Bearer token"` |
 | `router_type`         | Fully qualified Go type for the router.                                                                               | `github.com/go-sphere/httpx;Router`                         |
@@ -157,7 +157,7 @@ The plugin generates Go code with HTTP handlers, route registration, and Swagger
 func _TestService_RunTest0_HTTP_Handler(srv TestServiceHTTPServer) httpx.Handler {
     return httpz.WithJson(func(ctx httpx.Context) (*RunTestResponse, error) {
         var in RunTestRequest
-        if err := ctx.BindJSON(&in); err != nil {
+        if err := ctx.BindJSON(&in); err != nil && !errors.Is(err, io.EOF) {
             return nil, err
         }
         if err := ctx.BindQuery(&in); err != nil {
@@ -167,7 +167,7 @@ func _TestService_RunTest0_HTTP_Handler(srv TestServiceHTTPServer) httpx.Handler
             return nil, err
         }
         if err := protovalidate.Validate(&in); err != nil {
-            return nil, err
+            return nil, httpx.BadRequestError(err)
         }
         out, err := srv.RunTest(ctx.Context(), &in)
         if err != nil {
@@ -374,8 +374,14 @@ Notes:
 The plugin supports the following Google API HTTP annotations:
 
 - `get`, `post`, `put`, `patch`, `delete`: HTTP methods
-- `body`: Specifies the request body field (`*` for entire message)
-- `response_body`: Specifies the response body field
+- `body`: Specifies the request body field (`*` for entire message). It must name a top-level field of the request;
+  a nested path or unknown name is a generation error. With a single field selected, every other field needs a
+  `QUERY`, `URI` or `HEADER` location: a field left in the JSON body is never bound and is reported as a warning.
+  With `body: "*"` and no JSON-located request field, the handler does not read the body at all and the Swagger docs
+  declare none. Otherwise an empty request body is accepted (the JSON fields keep their zero values), as in
+  grpc-gateway, on every adapter except `fiberx`; validation then decides whether the request is acceptable, and a
+  validation failure is returned as `httpx.BadRequestError` (400).
+- `response_body`: Specifies the response body field; it must name a top-level field of the response
 - Path parameters: `{field_name}` in the URL path
 - Additional bindings: Multiple HTTP rules for the same RPC
 - Custom verbs: a `:verb` suffix on the last path segment (e.g. `post: "/v1/reports:generate"`) is kept as a literal part of the route; only a segment-leading `:` is treated as a gin-style parameter (see [Route grammar warnings](#route-grammar-warnings))
@@ -416,24 +422,23 @@ Fields can be bound to different parts of the HTTP request using sphere binding 
 - `BINDING_LOCATION_QUERY`: Query parameters
 - `BINDING_LOCATION_URI`: Path parameters
 - `BINDING_LOCATION_HEADER`: HTTP headers
-- `BINDING_LOCATION_FORM`: Form / multipart form data
+- `BINDING_LOCATION_FORM`: Form / multipart form data; only on methods with a body (`FORM` on `GET`, `HEAD`,
+  `DELETE` or `OPTIONS` is a generation-time error, because not every httpx adapter reads form values from the query
+  string; use `QUERY` there)
 
-> `QUERY`, `URI` and `HEADER` bind a value from a single string token, so only scalar fields (and the well-known scalar
-> wrappers `Timestamp`, `Duration` and `wrapperspb.*Value`) may use them. Marking a `map`, `bytes` or arbitrary
-> `message` field with one of these locations is a generation-time error. Use `JSON` (or `FORM` for `bytes`/files)
-> instead.
+> `QUERY`, `URI` and `HEADER` bind a value from a single string token, so only scalar and enum fields may use them.
+> Marking a `map`, `bytes` or `message` field with one of these locations is a generation-time error, well-known types
+> such as `Timestamp`, `Duration` and `wrapperspb.*Value` included: the httpx query/uri/header decoders cannot read
+> them from a single token. Use a scalar (for example `int64` Unix seconds or a proto3 `optional` scalar), or `JSON`
+> (or `FORM` for `bytes`/files).
 
 ### Oneof Fields
 
-Members of a `oneof` bind **only via the JSON body**. The query, URI, header and form binders skip them, so on a
-method without a body (for example `GET` or `DELETE`) a oneof member is always left at its zero value. Message-level
-`default_location` does not apply to oneof members either.
-
-Declaring a non-JSON location on a oneof (`(sphere.binding.default_oneof_location)`) or on one of its members
-(`(sphere.binding.location)`) has no effect. The plugin reports each such declaration as a generation warning (a hard
-error with `fail_on_warn=true`) and generates the file as before. To bind the value from the query string, a header or
-the path, move it out of the `oneof` into a plain (or proto3 `optional`) field. proto3 `optional` fields are not
-affected: their synthetic oneof is not a real oneof.
+A request message that contains a real `oneof`, directly or in a nested message, is a generation-time error. No
+generated handler can bind one: the JSON body is decoded with `encoding/json`, which ignores the interface-typed field
+`protoc-gen-go` emits for a oneof, and the query, URI, header and form binders skip oneof members. Replace the oneof
+with separate proto3 `optional` fields (their synthetic oneof is not a real oneof) and, if exactly one must be set,
+enforce it with a validation rule. Response messages may contain oneofs.
 
 ### Optional Fields
 

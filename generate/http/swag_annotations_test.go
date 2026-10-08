@@ -104,23 +104,14 @@ func TestSwagAnnotationEdgeCases(t *testing.T) {
 		})
 	})
 
-	t.Run("get_with_form_documents_query_params", func(t *testing.T) {
-		// Form-bound fields on a no-body method are read from the query
-		// string at runtime (gin form binding), so they must be documented
-		// as query parameters, and OpenAPI 2.0 forbids formData on GET.
-		assertAnnotations(t, blocks, "_SwagEdgeService_GetWithForm0_HTTP_Handler", []string{
-			"// @Accept json",
-			"// @Param upload_name query string false \"upload_name\"",
-			"// @Param upload_size query integer false \"upload_size\"",
-			"// @Router /api/swag/form [get]",
+	t.Run("post_with_form_documents_formdata_params", func(t *testing.T) {
+		// Form fields are only accepted on body-carrying methods (GET with a
+		// FORM field fails generation), where they are documented as formData.
+		assertAnnotations(t, blocks, "_SwagEdgeService_PostWithForm0_HTTP_Handler", []string{
+			"// @Param upload_name formData string false \"upload_name\"",
+			"// @Param upload_size formData integer false \"upload_size\"",
+			"// @Router /api/swag/form [post]",
 		})
-		block, ok := blocks["_SwagEdgeService_GetWithForm0_HTTP_Handler"]
-		if !ok {
-			t.Fatal("no swag block for GetWithForm handler")
-		}
-		if strings.Contains(block, "formData") || strings.Contains(block, "mpfd") {
-			t.Errorf("GET must not carry formData parameters:\n%s", block)
-		}
 	})
 
 	t.Run("repeated_wildcard_path_param_is_single_token", func(t *testing.T) {
@@ -294,4 +285,47 @@ func extractFuncBody(t *testing.T, content, handlerName string) string {
 		t.Fatalf("handler %s body not terminated", handlerName)
 	}
 	return content[start : start+end]
+}
+
+// TestStarBodyWithoutJSONFieldsSkipsBindJSON pins the adapter-independent
+// empty-body handling: with body:"*" and no JSON-located request field the
+// handler must not call BindJSON (some adapters reject an empty body) and the
+// Swagger docs must not declare a request body. A request that does have JSON
+// fields keeps BindJSON and tolerates an empty body via io.EOF.
+func TestStarBodyWithoutJSONFieldsSkipsBindJSON(t *testing.T) {
+	generate := func(t *testing.T, pb, proto string) string {
+		t.Helper()
+		set := testutil.LoadDescriptorSet(t, pb)
+		plugin := testutil.MustCreatePlugin(t, set, proto)
+		file := testutil.FileToGenerate(t, plugin)
+		genFile, err := GenerateFile(plugin, file, DefaultConfig())
+		if err != nil {
+			t.Fatalf("GenerateFile failed: %v", err)
+		}
+		content, err := genFile.Content()
+		if err != nil {
+			t.Fatalf("Content failed: %v", err)
+		}
+		return string(content)
+	}
+
+	t.Run("no JSON fields", func(t *testing.T) {
+		content := generate(t, "testdata/pb/binding.pb", "binding.proto")
+		handler := extractFuncBody(t, content, "_BindingService_Mix0_HTTP_Handler")
+		if strings.Contains(handler, "BindJSON") {
+			t.Errorf("handler must not bind JSON when the request has no JSON fields:\n%s", handler)
+		}
+		block := splitSwagBlocks(content)["_BindingService_Mix0_HTTP_Handler"]
+		if strings.Contains(block, " body ") {
+			t.Errorf("Swagger must not declare a request body:\n%s", block)
+		}
+	})
+
+	t.Run("with JSON fields", func(t *testing.T) {
+		content := generate(t, "testdata/pb/basic.pb", "basic.proto")
+		handler := extractFuncBody(t, content, "_BasicService_RunTest0_HTTP_Handler")
+		if !strings.Contains(handler, "ctx.BindJSON(&in); err != nil && !errors.Is(err, io.EOF)") {
+			t.Errorf("handler should bind JSON and tolerate an empty body:\n%s", handler)
+		}
+	})
 }

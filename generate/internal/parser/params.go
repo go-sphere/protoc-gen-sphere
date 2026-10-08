@@ -116,8 +116,21 @@ func QueryParams(m *protogen.Method, method string, pathVars []ParamsField) ([]P
 		}
 		loc := bindingLocationOf(m.Input, field)
 		switch loc {
-		case bindingpb.BindingLocation_BINDING_LOCATION_HEADER,
-			bindingpb.BindingLocation_BINDING_LOCATION_FORM:
+		case bindingpb.BindingLocation_BINDING_LOCATION_HEADER:
+			continue
+		case bindingpb.BindingLocation_BINDING_LOCATION_FORM:
+			// A body-less request carries no form payload, and the adapters
+			// disagree on whether BindForm falls back to the query string.
+			if _, ok := NoBodyMethods[method]; ok {
+				return nil, fmt.Errorf("method `%s.%s` field `%s` is bound to FORM, which is not allowed on %s: the request has no body, and not every httpx adapter reads form values from the query string; bind it to QUERY instead. File: `%s`, Field: `%s`",
+					m.Parent.Desc.Name(),
+					m.Desc.Name(),
+					name,
+					method,
+					m.Parent.Location.SourceFile,
+					m.Input.Desc.Name(),
+				)
+			}
 			continue
 		case bindingpb.BindingLocation_BINDING_LOCATION_JSON:
 			if _, ok := NoBodyMethods[method]; ok {
@@ -171,50 +184,80 @@ func FormParams(m *protogen.Method) ([]ParamsField, error) {
 }
 
 // isRealOneofMember reports whether field belongs to a real (non-synthetic)
-// oneof. Such fields bind only through the JSON body: every query/uri/header/
-// form collector skips them (see OneofBindingIssues).
+// oneof. Requests containing one are rejected before binding (see
+// FindRequestOneof); the collectors still skip such fields so they never emit
+// a binding for one.
 func isRealOneofMember(field *protogen.Field) bool {
 	return field.Oneof != nil && !field.Oneof.Desc.IsSynthetic()
 }
 
-// OneofBindingIssue is a binding location declared on a real oneof, or on one
-// of its member fields, that the generator cannot honor.
-type OneofBindingIssue struct {
-	// Subject names the declaring element, e.g. "oneof `kind`" or
-	// "field `text`".
-	Subject  string
-	Location bindingpb.BindingLocation
+// RequestOneof is a real oneof found in a request message tree.
+type RequestOneof struct {
+	// Path is the dot-separated proto field path from the request message to
+	// the message declaring the oneof; empty when the request message itself
+	// declares it. Map fields contribute their own name only.
+	Path string
+	// Oneof is the offending oneof.
+	Oneof *protogen.Oneof
 }
 
-// OneofBindingIssues returns the non-JSON binding locations declared on
-// message's real oneofs (default_oneof_location) and their members
-// (location), in declaration order. Oneof fields bind only via the JSON body,
-// so such declarations are silently ignored by the query/uri/header/form
-// collectors; callers report them as warnings rather than errors to keep
-// existing protos generating. An explicit UNSPECIFIED or JSON declaration is
-// consistent with that contract and is not reported.
-func OneofBindingIssues(message *protogen.Message) []OneofBindingIssue {
-	var issues []OneofBindingIssue
-	add := func(subject string, opts proto.Message, ext protoreflect.ExtensionType) {
-		if !proto.HasExtension(opts, ext) {
-			return
-		}
-		loc, ok := proto.GetExtension(opts, ext).(bindingpb.BindingLocation)
-		if !ok || loc == bindingpb.BindingLocation_BINDING_LOCATION_UNSPECIFIED || loc == bindingpb.BindingLocation_BINDING_LOCATION_JSON {
-			return
-		}
-		issues = append(issues, OneofBindingIssue{Subject: subject, Location: loc})
+// FindRequestOneof returns the first real (non-synthetic) oneof declared by
+// message or by a message reachable through its fields, including map values,
+// searching depth-first in declaration order. Messages of the google.protobuf
+// package are not searched. ok is false when there is none.
+//
+// No generated handler can bind a real oneof: the JSON body is decoded with
+// encoding/json, which ignores the interface-typed oneof field protoc-gen-go
+// emits, and the query/uri/header/form binders skip oneof members.
+func FindRequestOneof(message *protogen.Message) (RequestOneof, bool) {
+	return findOneof(message, "", make(map[protoreflect.FullName]struct{}))
+}
+
+func findOneof(message *protogen.Message, path string, seen map[protoreflect.FullName]struct{}) (RequestOneof, bool) {
+	if message == nil || message.Desc.ParentFile().Package() == "google.protobuf" {
+		return RequestOneof{}, false
 	}
+	if _, ok := seen[message.Desc.FullName()]; ok {
+		return RequestOneof{}, false
+	}
+	seen[message.Desc.FullName()] = struct{}{}
 	for _, oneof := range message.Oneofs {
-		if oneof.Desc.IsSynthetic() {
+		if !oneof.Desc.IsSynthetic() {
+			return RequestOneof{Path: path, Oneof: oneof}, true
+		}
+	}
+	for _, field := range message.Fields {
+		next := field.Message
+		if field.Desc.IsMap() {
+			next = field.Message.Fields[1].Message
+		}
+		fieldPath := string(field.Desc.Name())
+		if path != "" {
+			fieldPath = path + "." + fieldPath
+		}
+		if found, ok := findOneof(next, fieldPath, seen); ok {
+			return found, true
+		}
+	}
+	return RequestOneof{}, false
+}
+
+// JSONFields returns the top-level fields of message whose binding location is
+// JSON, explicitly or by default (no location and no default_location). Real
+// oneof members are excluded.
+func JSONFields(message *protogen.Message) []*protogen.Field {
+	var fields []*protogen.Field
+	for _, field := range message.Fields {
+		if isRealOneofMember(field) {
 			continue
 		}
-		add(fmt.Sprintf("oneof `%s`", oneof.Desc.Name()), oneof.Desc.Options(), bindingpb.E_DefaultOneofLocation)
-		for _, field := range oneof.Fields {
-			add(fmt.Sprintf("field `%s`", field.Desc.Name()), field.Desc.Options(), bindingpb.E_Location)
+		switch bindingLocationOf(message, field) {
+		case bindingpb.BindingLocation_BINDING_LOCATION_UNSPECIFIED,
+			bindingpb.BindingLocation_BINDING_LOCATION_JSON:
+			fields = append(fields, field)
 		}
 	}
-	return issues
+	return fields
 }
 
 func routeParamForField(fieldName string, params map[string]bool) (string, bool, bool) {
@@ -241,16 +284,15 @@ func bindingLocationOf(message *protogen.Message, field *protogen.Field) binding
 }
 
 // checkScalarBindable returns a descriptive error when field cannot be bound
-// from a single QUERY/URI/HEADER token. Maps, bytes and arbitrary messages have
-// no scalar text form, so binding them silently produces a tag the runtime
-// cannot decode; failing at generation time surfaces the mistake early. Scalar
-// kinds and well-known scalar wrappers (Timestamp/Duration/wrapperspb.*Value)
-// are allowed through.
+// from a single QUERY/URI/HEADER token. Maps, bytes and message fields
+// (well-known types included) have no scalar text form the runtime binders
+// decode, so binding them silently produces a tag the runtime cannot satisfy;
+// failing at generation time surfaces the mistake early.
 func checkScalarBindable(m *protogen.Method, field *protogen.Field, location string) error {
 	if isScalarBindable(field) {
 		return nil
 	}
-	return fmt.Errorf("method `%s.%s` field `%s` of type `%s` cannot be bound to %s: only scalar types (and well-known scalar wrappers) are supported there. File: `%s`, Message: `%s`",
+	return fmt.Errorf("method `%s.%s` field `%s` of type `%s` cannot be bound to %s: only scalar and enum types are supported there. File: `%s`, Message: `%s`",
 		m.Parent.Desc.Name(),
 		m.Desc.Name(),
 		field.Desc.Name(),
@@ -262,25 +304,22 @@ func checkScalarBindable(m *protogen.Method, field *protogen.Field, location str
 }
 
 // isScalarBindable reports whether field can be bound from a single string token
-// (query/uri/header). Maps and bytes cannot; message fields are only allowed
-// when they are well-known scalar wrappers.
+// (query/uri/header). Maps, bytes and messages cannot: the form decoders the
+// httpx adapters use have no conversion for well-known types such as
+// Timestamp, Duration or wrapperspb.*Value either.
 //
-// isScalarBindable, fieldKindDesc and the wellKnownSwaggerScalar allowlist are
-// mirrored by hand in protoc-gen-sphere-binding (generate/binding/tagger.go).
-// The shared fixture generate/http/testdata/proto/scalar_bindability.proto and
-// its expected table testdata/golden/scalar_bindability.golden pin the
-// decisions in both repos (TestScalarBindabilityContract). Keep them
-// byte-identical; update both.
+// isScalarBindable and fieldKindDesc are mirrored by hand in
+// protoc-gen-sphere-binding (generate/binding/tagger.go). The shared fixture
+// generate/http/testdata/proto/scalar_bindability.proto and its expected table
+// testdata/golden/scalar_bindability.golden pin the decisions in both repos
+// (TestScalarBindabilityContract). Keep them byte-identical; update both.
 func isScalarBindable(field *protogen.Field) bool {
 	if field.Desc.IsMap() {
 		return false
 	}
 	switch field.Desc.Kind() {
-	case protoreflect.BytesKind:
+	case protoreflect.BytesKind, protoreflect.MessageKind, protoreflect.GroupKind:
 		return false
-	case protoreflect.MessageKind, protoreflect.GroupKind:
-		_, ok := wellKnownSwaggerScalar(field)
-		return ok
 	default:
 		return true
 	}

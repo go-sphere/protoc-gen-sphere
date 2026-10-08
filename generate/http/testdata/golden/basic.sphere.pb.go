@@ -8,8 +8,10 @@ package basicv1
 
 import (
 	context "context"
+	errors "errors"
 	httpx "github.com/go-sphere/httpx"
 	httpz "github.com/go-sphere/sphere/server/httpz"
+	io "io"
 )
 
 var _ = new(context.Context)
@@ -49,7 +51,7 @@ type BasicServiceHTTPServer interface {
 func _BasicService_RunTest0_HTTP_Handler(srv BasicServiceHTTPServer) httpx.Handler {
 	return httpz.WithJson(func(ctx httpx.Context) (*RunTestResponse, error) {
 		var in RunTestRequest
-		if err := ctx.BindJSON(&in); err != nil {
+		if err := ctx.BindJSON(&in); err != nil && !errors.Is(err, io.EOF) {
 			return nil, err
 		}
 		if err := ctx.BindQuery(&in); err != nil {
@@ -79,7 +81,7 @@ func _BasicService_RunTest0_HTTP_Handler(srv BasicServiceHTTPServer) httpx.Handl
 func _BasicService_BodyPathTest0_HTTP_Handler(srv BasicServiceHTTPServer) httpx.Handler {
 	return httpz.WithJson(func(ctx httpx.Context) ([]*BodyPathTestResponse_Response, error) {
 		var in BodyPathTestRequest
-		if err := ctx.BindJSON(&in.Request); err != nil {
+		if err := ctx.BindJSON(&in.Request); err != nil && !errors.Is(err, io.EOF) {
 			return nil, err
 		}
 		out, err := srv.BodyPathTest(ctx.Context(), &in)

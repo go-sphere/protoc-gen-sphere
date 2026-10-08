@@ -39,7 +39,7 @@ func buildServiceDesc(g *parser.GeneratedFile, service *protogen.Service, cfg *f
 		rule, ok := proto.GetExtension(method.Desc.Options(), annotations.E_Http).(*annotations.HttpRule)
 		hasRule := rule != nil && ok
 		if hasRule || !cfg.omitEmpty {
-			if err := warnOneofBindings(method, cfg); err != nil {
+			if err := checkRequestOneof(method); err != nil {
 				return nil, err
 			}
 		}
@@ -80,24 +80,29 @@ func buildServiceDesc(g *parser.GeneratedFile, service *protogen.Service, cfg *f
 	return sd, nil
 }
 
-// warnOneofBindings reports binding locations declared on the request's real
-// oneofs or their members. Oneof fields bind only via the JSON body, so a
-// QUERY/URI/HEADER/FORM declaration there is ignored and the field stays zero
-// on requests without a body. Reported once per method (not per binding).
-func warnOneofBindings(method *protogen.Method, cfg *fileConfig) error {
-	for _, issue := range parser.OneofBindingIssues(method.Input) {
-		if err := cfg.warn("method `%s.%s` %s declares %s, but oneof fields bind only via the JSON body; the declaration is ignored. File: `%s`, Message: `%s`",
-			method.Parent.Desc.Name(),
-			method.Desc.Name(),
-			issue.Subject,
-			issue.Location,
-			method.Parent.Location.SourceFile,
-			method.Input.Desc.Name(),
-		); err != nil {
-			return err
-		}
+// checkRequestOneof rejects a request message that contains a real oneof,
+// directly or in a nested message. Generated handlers cannot bind one: the JSON
+// body is decoded with encoding/json, which ignores the interface-typed field
+// protoc-gen-go emits for a oneof, and the query/uri/header/form binders skip
+// oneof members. Proto3 optional fields (synthetic oneofs) are fine.
+func checkRequestOneof(method *protogen.Method) error {
+	found, ok := parser.FindRequestOneof(method.Input)
+	if !ok {
+		return nil
 	}
-	return nil
+	where := "request message"
+	if found.Path != "" {
+		where = fmt.Sprintf("request field `%s`", found.Path)
+	}
+	return fmt.Errorf("method `%s.%s` %s contains oneof `%s` (message `%s`), which generated HTTP handlers cannot bind: the JSON body is decoded with encoding/json, which ignores oneof fields, and query/uri/header/form binding skips them; replace the oneof with separate optional fields. File: `%s`, Message: `%s`",
+		method.Parent.Desc.Name(),
+		method.Desc.Name(),
+		where,
+		found.Oneof.Desc.Name(),
+		found.Oneof.Parent.Desc.FullName(),
+		method.Parent.Location.SourceFile,
+		method.Input.Desc.Name(),
+	)
 }
 
 func buildHTTPRule(g *parser.GeneratedFile, service *protogen.Service, method *protogen.Method, rule *annotations.HttpRule, cfg *fileConfig) (*template.MethodDesc, error) {
@@ -197,6 +202,13 @@ func buildMethodDesc(g *parser.GeneratedFile, method *protogen.Method, rule *par
 		rule.ResponseBody = ""
 	}
 
+	if err := checkTopLevelField(method, method.Input, "body", rule.Body); err != nil {
+		return nil, err
+	}
+	if err := checkTopLevelField(method, method.Output, "response_body", rule.ResponseBody); err != nil {
+		return nil, err
+	}
+
 	vars, err := parser.URIParams(method, route)
 	if err != nil {
 		return nil, err
@@ -215,6 +227,18 @@ func buildMethodDesc(g *parser.GeneratedFile, method *protogen.Method, rule *par
 	headers, err := parser.HeaderParams(method)
 	if err != nil {
 		return nil, err
+	}
+
+	if rule.HasBody && rule.Body != "" && len(forms) == 0 {
+		if err := warnFieldsOutsideBody(method, rule.Body, cfg); err != nil {
+			return nil, err
+		}
+	}
+	// With body:"*" and no JSON-located field there is nothing to decode.
+	// Skipping BindJSON keeps an empty body valid on every adapter, and the
+	// Swagger docs then declare no request body.
+	if rule.HasBody && rule.Body == "" && len(parser.JSONFields(method.Input)) == 0 {
+		rule.HasBody = false
 	}
 
 	swag := &parser.SwagParams{
@@ -260,6 +284,12 @@ func buildMethodDesc(g *parser.GeneratedFile, method *protogen.Method, rule *par
 	}
 	responseZero := goZeroValue(response)
 
+	hasBody := rule.HasBody && len(forms) == 0
+	if hasBody && cfg.packageDesc.ErrorsIsFunc == "" {
+		cfg.packageDesc.ErrorsIsFunc = g.QualifiedUsedGoIdent(protogen.GoImportPath("errors").Ident("Is"))
+		cfg.packageDesc.EOFVar = g.QualifiedUsedGoIdent(protogen.GoImportPath("io").Ident("EOF"))
+	}
+
 	handlerWrapper := cfg.serverHandlerFunc
 	streamType := ""
 	if isServerStream {
@@ -286,7 +316,7 @@ func buildMethodDesc(g *parser.GeneratedFile, method *protogen.Method, rule *par
 		HasVars:      len(vars) > 0,
 		HasQuery:     len(queries) > 0,
 		HasForm:      len(forms) > 0,
-		HasBody:      rule.HasBody && len(forms) == 0,
+		HasBody:      hasBody,
 		HasHeader:    len(headers) > 0,
 		NeedValidate: needValidate,
 
@@ -299,6 +329,59 @@ func buildMethodDesc(g *parser.GeneratedFile, method *protogen.Method, rule *par
 		Body:         bodyPath,
 		ResponseBody: responsePath,
 	}, nil
+}
+
+// checkTopLevelField rejects a body or response_body selector that is not the
+// name of a top-level field of message. google.api.http requires a top-level
+// field; a nested path would make the generated handler dereference a nil
+// intermediate message, and an unknown name would bind the whole message.
+func checkTopLevelField(method *protogen.Method, message *protogen.Message, option, path string) error {
+	if path == "" {
+		return nil
+	}
+	if strings.Contains(path, ".") {
+		return fmt.Errorf("method `%s.%s` %s `%s` is a nested field path; google.api.http requires a top-level field of message `%s`. File: `%s`",
+			method.Parent.Desc.Name(),
+			method.Desc.Name(),
+			option,
+			path,
+			message.Desc.Name(),
+			method.Parent.Location.SourceFile,
+		)
+	}
+	if parser.ProtoKeyPathToField(message, []string{path}) == nil {
+		return fmt.Errorf("method `%s.%s` %s `%s` is not a field of message `%s`. File: `%s`",
+			method.Parent.Desc.Name(),
+			method.Desc.Name(),
+			option,
+			path,
+			message.Desc.Name(),
+			method.Parent.Location.SourceFile,
+		)
+	}
+	return nil
+}
+
+// warnFieldsOutsideBody reports the request fields left without a source when
+// body names a single field: the JSON body decodes only into that field, so the
+// other JSON-located fields (explicit or by default) always stay zero.
+func warnFieldsOutsideBody(method *protogen.Method, body string, cfg *fileConfig) error {
+	for _, field := range parser.JSONFields(method.Input) {
+		if string(field.Desc.Name()) == body {
+			continue
+		}
+		if err := cfg.warn("method `%s.%s` field `%s` is bound to the JSON body, but body is `%s`, so the field is never bound; give it a QUERY, URI or HEADER location, or use body: \"*\". File: `%s`, Message: `%s`",
+			method.Parent.Desc.Name(),
+			method.Desc.Name(),
+			field.Desc.Name(),
+			body,
+			method.Parent.Location.SourceFile,
+			method.Input.Desc.Name(),
+		); err != nil {
+			return err
+		}
+	}
+	return nil
 }
 
 func buildMethodComment(method *protogen.Method) string {

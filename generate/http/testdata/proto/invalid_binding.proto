@@ -3,15 +3,18 @@ syntax = "proto3";
 package testdata.invalid.v1;
 
 import "google/api/annotations.proto";
+import "google/protobuf/timestamp.proto";
 import "sphere/binding/binding.proto";
 
 option go_package = "github.com/go-sphere/protoc-gen-sphere/generate/http/testdata/gen/invalidv1;invalidv1";
 
-// InvalidService collects requests whose fields are bound to a location that
-// cannot decode them (map / message / bytes bound to QUERY / URI / HEADER). The
-// plugin must reject these at generation time instead of emitting an unusable
-// binding. Each method is exercised individually by the validation test; the
-// file as a whole is never turned into a golden fixture.
+// InvalidService collects requests the generated handler cannot bind: fields
+// bound to a location that cannot decode them (map / message / bytes /
+// well-known types bound to QUERY / URI / HEADER, FORM on GET), a real oneof
+// in the request, and body / response_body selectors that are not top-level
+// fields. The plugin must reject these at generation time instead of emitting
+// an unusable binding. Each method is exercised individually by the validation
+// test; the file as a whole is never turned into a golden fixture.
 service InvalidService {
   rpc QueryMessage(QueryMessageRequest) returns (Empty) {
     option (google.api.http) = {
@@ -26,6 +29,43 @@ service InvalidService {
     option (google.api.http) = {
       post: "/api/h"
       body: "*"
+    };
+  }
+  rpc QueryTimestamp(QueryTimestampRequest) returns (Empty) {
+    option (google.api.http) = {get: "/api/t"};
+  }
+  rpc FormOnGet(FormOnGetRequest) returns (Empty) {
+    option (google.api.http) = {get: "/api/f"};
+  }
+  rpc NestedOneof(NestedOneofRequest) returns (Empty) {
+    option (google.api.http) = {
+      post: "/api/o"
+      body: "*"
+    };
+  }
+  rpc NestedBody(BodyFieldRequest) returns (Empty) {
+    option (google.api.http) = {
+      post: "/api/b"
+      body: "inner.a"
+    };
+  }
+  rpc UnknownBody(BodyFieldRequest) returns (Empty) {
+    option (google.api.http) = {
+      post: "/api/b2"
+      body: "missing"
+    };
+  }
+  rpc NestedResponseBody(Empty) returns (NestedResponse) {
+    option (google.api.http) = {
+      post: "/api/r"
+      body: "*"
+      response_body: "inner.a"
+    };
+  }
+  rpc FieldsOutsideBody(BodyFieldRequest) returns (Empty) {
+    option (google.api.http) = {
+      post: "/api/b3"
+      body: "inner"
     };
   }
 }
@@ -49,4 +89,37 @@ message UriMessageRequest {
 // A map field cannot be bound from a header token.
 message HeaderMapRequest {
   map<string, string> data = 1 [(sphere.binding.location) = BINDING_LOCATION_HEADER];
+}
+
+// Well-known types have no single-token form the httpx query decoders read.
+message QueryTimestampRequest {
+  google.protobuf.Timestamp since = 1 [(sphere.binding.location) = BINDING_LOCATION_QUERY];
+}
+
+// A GET request has no form payload to bind from.
+message FormOnGetRequest {
+  string name = 1 [(sphere.binding.location) = BINDING_LOCATION_FORM];
+}
+
+message WithOneof {
+  oneof kind {
+    string text = 1;
+    int64 number = 2;
+  }
+}
+
+// A real oneof anywhere in the request tree cannot be bound.
+message NestedOneofRequest {
+  WithOneof item = 1;
+}
+
+// version stays JSON-located while body selects only inner.
+message BodyFieldRequest {
+  Inner inner = 1;
+  string version = 2;
+  string token = 3 [(sphere.binding.location) = BINDING_LOCATION_HEADER];
+}
+
+message NestedResponse {
+  Inner inner = 1;
 }

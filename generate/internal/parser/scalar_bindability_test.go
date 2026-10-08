@@ -76,10 +76,10 @@ func scalarBindabilityCollector(loc bindingpb.BindingLocation) (string, paramsCo
 // scalarBindabilityDecision runs collect on a view of m whose input holds only
 // field, so each decision is independent of the other fields.
 //
-// Real oneof members are detached from their oneof first: this plugin never
-// binds them outside the JSON body (the collectors skip them and
-// OneofBindingIssues warns), so their rows pin the shared predicate that would
-// apply if they were bound, which is what protoc-gen-sphere-binding enforces.
+// Real oneof members are detached from their oneof first: this plugin rejects
+// requests with a real oneof (and the collectors skip oneof members), so their
+// rows pin the shared predicate that would apply if they were bound, which is
+// what protoc-gen-sphere-binding enforces.
 func scalarBindabilityDecision(t *testing.T, m *protogen.Method, field *protogen.Field, collect paramsCollector) string {
 	t.Helper()
 	f := *field
@@ -93,7 +93,7 @@ func scalarBindabilityDecision(t *testing.T, m *protogen.Method, field *protogen
 
 	params, err := collect(&method, string(f.Desc.Name()))
 	if err != nil {
-		if !strings.Contains(err.Error(), "only scalar types") {
+		if !strings.Contains(err.Error(), "only scalar and enum types") {
 			t.Fatalf("%s.%s: unexpected error: %v", m.Input.Desc.Name(), f.Desc.Name(), err)
 		}
 		return "reject"

@@ -42,16 +42,12 @@ type BindingServiceHTTPServer interface {
 // @Param path_id path string true "path_id"
 // @Param q1 query string false "q1"
 // @Param q2 query integer false "q2"
-// @Param request body MixRequest true "request body"
 // @Success 200 {object} httpz.DataResponse[MixResponse]
 // @Failure 400,401,403,500,default {object} httpz.ErrorResponse
 // @Router /api/mix/{path_id} [post]
 func _BindingService_Mix0_HTTP_Handler(srv BindingServiceHTTPServer) httpx.Handler {
 	return httpz.WithJson(func(ctx httpx.Context) (*MixResponse, error) {
 		var in MixRequest
-		if err := ctx.BindJSON(&in); err != nil {
-			return nil, err
-		}
 		if err := ctx.BindHeader(&in); err != nil {
 			return nil, err
 		}

@@ -8,8 +8,10 @@ package swagv1
 
 import (
 	context "context"
+	errors "errors"
 	httpx "github.com/go-sphere/httpx"
 	httpz "github.com/go-sphere/sphere/server/httpz"
+	io "io"
 )
 
 var _ = new(context.Context)
@@ -17,7 +19,7 @@ var _ = new(httpx.Router)
 var _ = new(httpz.ErrorResponse)
 
 const OperationSwagEdgeServiceNoBodyPost = "/testdata.swag.v1.SwagEdgeService/NoBodyPost"
-const OperationSwagEdgeServiceGetWithForm = "/testdata.swag.v1.SwagEdgeService/GetWithForm"
+const OperationSwagEdgeServicePostWithForm = "/testdata.swag.v1.SwagEdgeService/PostWithForm"
 const OperationSwagEdgeServiceWildcardList = "/testdata.swag.v1.SwagEdgeService/WildcardList"
 const OperationSwagEdgeServiceMapBody = "/testdata.swag.v1.SwagEdgeService/MapBody"
 const OperationSwagEdgeServiceScalarResponseBody = "/testdata.swag.v1.SwagEdgeService/ScalarResponseBody"
@@ -28,7 +30,7 @@ const OperationSwagEdgeServiceEnumListQuery = "/testdata.swag.v1.SwagEdgeService
 
 var EndpointsSwagEdgeService = [...][3]string{
 	{OperationSwagEdgeServiceNoBodyPost, "POST", "/api/swag/post"},
-	{OperationSwagEdgeServiceGetWithForm, "GET", "/api/swag/form"},
+	{OperationSwagEdgeServicePostWithForm, "POST", "/api/swag/form"},
 	{OperationSwagEdgeServiceWildcardList, "GET", "/api/swag/repeated/*names"},
 	{OperationSwagEdgeServiceMapBody, "POST", "/api/swag/map"},
 	{OperationSwagEdgeServiceScalarResponseBody, "GET", "/api/swag/scalar-response"},
@@ -42,8 +44,8 @@ type SwagEdgeServiceHTTPServer interface {
 	// NoBodyPost NoBodyPost declares a POST without a body: the handler never binds JSON,
 	// so the Swagger block must not advertise a request body.
 	NoBodyPost(context.Context, *NoBodyPostRequest) (*NoBodyPostResponse, error)
-	// GetWithForm GetWithForm binds fields as form data on a GET request.
-	GetWithForm(context.Context, *GetWithFormRequest) (*GetWithFormResponse, error)
+	// PostWithForm PostWithForm binds fields as form data on a POST request.
+	PostWithForm(context.Context, *PostWithFormRequest) (*PostWithFormResponse, error)
 	// WildcardList WildcardList binds a repeated string to a catch-all path segment.
 	WildcardList(context.Context, *WildcardListRequest) (*WildcardListResponse, error)
 	// MapBody MapBody projects the request body onto a map field.
@@ -86,24 +88,24 @@ func _SwagEdgeService_NoBodyPost0_HTTP_Handler(srv SwagEdgeServiceHTTPServer) ht
 	})
 }
 
-// @Summary GetWithForm
-// @Description GetWithForm binds fields as form data on a GET request.
+// @Summary PostWithForm
+// @Description PostWithForm binds fields as form data on a POST request.
 // @Tags testdata.swag.v1,testdata.swag.v1.SwagEdgeService
-// @Accept json
+// @Accept mpfd
 // @Produce json
 // @Param Authorization header string false "Bearer token"
-// @Param upload_name query string false "upload_name"
-// @Param upload_size query integer false "upload_size"
-// @Success 200 {object} httpz.DataResponse[GetWithFormResponse]
+// @Param upload_name formData string false "upload_name"
+// @Param upload_size formData integer false "upload_size"
+// @Success 200 {object} httpz.DataResponse[PostWithFormResponse]
 // @Failure 400,401,403,500,default {object} httpz.ErrorResponse
-// @Router /api/swag/form [get]
-func _SwagEdgeService_GetWithForm0_HTTP_Handler(srv SwagEdgeServiceHTTPServer) httpx.Handler {
-	return httpz.WithJson(func(ctx httpx.Context) (*GetWithFormResponse, error) {
-		var in GetWithFormRequest
+// @Router /api/swag/form [post]
+func _SwagEdgeService_PostWithForm0_HTTP_Handler(srv SwagEdgeServiceHTTPServer) httpx.Handler {
+	return httpz.WithJson(func(ctx httpx.Context) (*PostWithFormResponse, error) {
+		var in PostWithFormRequest
 		if err := ctx.BindForm(&in); err != nil {
 			return nil, err
 		}
-		out, err := srv.GetWithForm(ctx.Context(), &in)
+		out, err := srv.PostWithForm(ctx.Context(), &in)
 		if err != nil {
 			return nil, err
 		}
@@ -148,7 +150,7 @@ func _SwagEdgeService_WildcardList0_HTTP_Handler(srv SwagEdgeServiceHTTPServer) 
 func _SwagEdgeService_MapBody0_HTTP_Handler(srv SwagEdgeServiceHTTPServer) httpx.Handler {
 	return httpz.WithJson(func(ctx httpx.Context) (*MapBodyResponse, error) {
 		var in MapBodyRequest
-		if err := ctx.BindJSON(&in.Attrs); err != nil {
+		if err := ctx.BindJSON(&in.Attrs); err != nil && !errors.Is(err, io.EOF) {
 			return nil, err
 		}
 		out, err := srv.MapBody(ctx.Context(), &in)
@@ -274,7 +276,7 @@ func _SwagEdgeService_EnumListQuery0_HTTP_Handler(srv SwagEdgeServiceHTTPServer)
 func RegisterSwagEdgeServiceHTTPServer(route httpx.Router, srv SwagEdgeServiceHTTPServer) {
 	r := route.Group("/")
 	r.Handle("POST", "/api/swag/post", _SwagEdgeService_NoBodyPost0_HTTP_Handler(srv))
-	r.Handle("GET", "/api/swag/form", _SwagEdgeService_GetWithForm0_HTTP_Handler(srv))
+	r.Handle("POST", "/api/swag/form", _SwagEdgeService_PostWithForm0_HTTP_Handler(srv))
 	r.Handle("GET", "/api/swag/repeated/*names", _SwagEdgeService_WildcardList0_HTTP_Handler(srv))
 	r.Handle("POST", "/api/swag/map", _SwagEdgeService_MapBody0_HTTP_Handler(srv))
 	r.Handle("GET", "/api/swag/scalar-response", _SwagEdgeService_ScalarResponseBody0_HTTP_Handler(srv))

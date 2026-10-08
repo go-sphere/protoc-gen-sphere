@@ -14,9 +14,9 @@ service SwagEdgeService {
     option (google.api.http) = {post: "/api/swag/post"};
   }
 
-  // GetWithForm binds fields as form data on a GET request.
-  rpc GetWithForm(GetWithFormRequest) returns (GetWithFormResponse) {
-    option (google.api.http) = {get: "/api/swag/form"};
+  // PostWithForm binds fields as form data on a POST request.
+  rpc PostWithForm(PostWithFormRequest) returns (PostWithFormResponse) {
+    option (google.api.http) = {post: "/api/swag/form"};
   }
 
   // WildcardList binds a repeated string to a catch-all path segment.
@@ -77,12 +77,12 @@ message NoBodyPostResponse {
   bool ok = 1;
 }
 
-message GetWithFormRequest {
+message PostWithFormRequest {
   string upload_name = 1 [(sphere.binding.location) = BINDING_LOCATION_FORM];
   int64 upload_size = 2 [(sphere.binding.location) = BINDING_LOCATION_FORM];
 }
 
-message GetWithFormResponse {
+message PostWithFormResponse {
   bool ok = 1;
 }
 

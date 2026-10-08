@@ -20,12 +20,6 @@ service ValidateService {
       body: "*"
     };
   }
-  rpc OneofCreate(OneofCreateRequest) returns (CreateResponse) {
-    option (google.api.http) = {
-      post: "/api/oneof"
-      body: "*"
-    };
-  }
 }
 
 message CreateRequest {
@@ -41,7 +35,9 @@ message NestedUser {
   string email = 1 [(buf.validate.field).required = true];
 }
 
-// OneofCreateRequest carries only a oneof-level rule.
+// OneofCreateRequest carries only a oneof-level rule. It is not an rpc input:
+// a request with a real oneof fails generation. TestRequestNeedsValidateNested
+// checks the message directly.
 message OneofCreateRequest {
   oneof contact {
     option (buf.validate.oneof).required = true;

@@ -8,8 +8,10 @@ package streamingv1
 
 import (
 	context "context"
+	errors "errors"
 	httpx "github.com/go-sphere/httpx"
 	httpz "github.com/go-sphere/sphere/server/httpz"
+	io "io"
 )
 
 var _ = new(context.Context)
@@ -80,7 +82,7 @@ func _StreamService_Watch0_HTTP_Handler(srv StreamServiceHTTPServer) httpx.Handl
 func _StreamService_Chat0_HTTP_Handler(srv StreamServiceHTTPServer) httpx.Handler {
 	return httpz.WithSSE(func(ctx httpx.Context) (httpz.SSEStream[*ChatResponse], error) {
 		var in ChatRequest
-		if err := ctx.BindJSON(&in); err != nil {
+		if err := ctx.BindJSON(&in); err != nil && !errors.Is(err, io.EOF) {
 			return nil, err
 		}
 		stdCtx := ctx.Context()

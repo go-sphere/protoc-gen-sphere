@@ -97,7 +97,18 @@ type PackageDesc struct {
 	ErrorResponseType string
 	DataResponseType  string
 
-	ValidateFunc string
+	// ValidateFunc is the qualified request validator, and ValidateErrorFunc
+	// the qualified func(error) error that wraps its failure (an
+	// httpx.BadRequestError, so the client gets 400). Both are empty when no
+	// request in the file needs validation.
+	ValidateFunc      string
+	ValidateErrorFunc string
+
+	// ErrorsIsFunc and EOFVar are the qualified errors.Is and io.EOF, set when
+	// a method binds a JSON body: an empty body (io.EOF) leaves the body
+	// fields at their zero values instead of failing the request.
+	ErrorsIsFunc string
+	EOFVar       string
 
 	ContextLoadFunc string
 }

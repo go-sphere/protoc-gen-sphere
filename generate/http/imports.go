@@ -9,6 +9,10 @@ import (
 
 const validatePackage = protogen.GoImportPath("buf.build/go/protovalidate")
 
+// validateErrorFunc wraps a validation failure so the response is 400 rather
+// than the 500 an unclassified error maps to.
+var validateErrorFunc = protogen.GoImportPath(defaultHTTPxPackage).Ident("BadRequestError")
+
 // collectGoImport emits the `var _ = ...` lines that keep referenced-but-unused
 // imports alive in the generated file, and, when any request message needs
 // validation, wires up the validate func on the package descriptor.
@@ -37,6 +41,7 @@ LOOP:
 				ident := validatePackage.Ident("Validate")
 				lines = append(lines, fmt.Sprintf("var _ = %s", g.QualifiedGoIdent(ident)))
 				fileCfg.packageDesc.ValidateFunc = g.QualifiedGoIdent(ident)
+				fileCfg.packageDesc.ValidateErrorFunc = g.QualifiedGoIdent(validateErrorFunc)
 				break LOOP
 			}
 		}

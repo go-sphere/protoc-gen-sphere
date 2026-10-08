@@ -53,9 +53,9 @@ func goldenCases() []goldenCase {
 			goldenFile: "testdata/golden/binding.sphere.pb.go",
 		},
 		{
-			// Comprehensive cross-plugin fixture: nested message + map + oneof in
-			// the JSON body, a multipart form upload, and well-known types bound as
-			// query params. Also exercised semantically by TestIntegrationOutput.
+			// Comprehensive cross-plugin fixture: nested message + map +
+			// well-known type in the JSON body, a multipart form upload, optional
+			// scalars bound as query params, and a oneof in a response.
 			name:       "integration",
 			pbFile:     "testdata/pb/integration.pb",
 			protoName:  "integration.proto",

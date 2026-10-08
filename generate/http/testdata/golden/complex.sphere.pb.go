@@ -8,8 +8,10 @@ package complexv1
 
 import (
 	context "context"
+	errors "errors"
 	httpx "github.com/go-sphere/httpx"
 	httpz "github.com/go-sphere/sphere/server/httpz"
+	io "io"
 )
 
 var _ = new(context.Context)
@@ -92,7 +94,7 @@ func _ComplexService_GetItem1_HTTP_Handler(srv ComplexServiceHTTPServer) httpx.H
 func _ComplexService_UpdateItem0_HTTP_Handler(srv ComplexServiceHTTPServer) httpx.Handler {
 	return httpz.WithJson(func(ctx httpx.Context) (*Item, error) {
 		var in UpdateItemRequest
-		if err := ctx.BindJSON(&in.Item); err != nil {
+		if err := ctx.BindJSON(&in.Item); err != nil && !errors.Is(err, io.EOF) {
 			return nil, err
 		}
 		if err := ctx.BindURI(&in); err != nil {

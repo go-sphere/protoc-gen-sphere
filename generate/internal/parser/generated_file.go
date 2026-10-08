@@ -39,3 +39,10 @@ func (g *GeneratedFile) Dummies() []protogen.GoIdent {
 	}
 	return idents
 }
+
+// QualifiedUsedGoIdent returns the qualified identifier for id without
+// recording a `var _ = ...` keep-alive reference. Use it only for identifiers
+// the rendered code always references, which keep their import alive.
+func (g *GeneratedFile) QualifiedUsedGoIdent(id protogen.GoIdent) string {
+	return g.g.QualifiedGoIdent(id)
+}
