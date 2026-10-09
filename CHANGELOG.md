@@ -2,6 +2,12 @@
 
 ## Unreleased
 
+### Added
+
+- Tests run the route grammar fixture shared with httpx
+  (`generate/http/testdata/golden/route_grammar.golden`, byte-identical to
+  httpx's `testdata/route_grammar.golden`) through `RouteViolations`.
+
 ## v0.0.6 (2026-10-08)
 
 ### Changed

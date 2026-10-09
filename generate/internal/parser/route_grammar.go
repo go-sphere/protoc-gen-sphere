@@ -22,8 +22,12 @@ import (
 // The rules are mirrored here rather than imported. This plugin does not
 // depend on httpx — it only names it in default configuration strings — and
 // coupling a codegen plugin's version to the runtime library's would be a real
-// cost. Keep the two in sync by hand. The per-adapter behavior quoted in the
-// violation details was measured against the httpx v0.0.5 adapters.
+// cost. The wildcard half is pinned instead by a fixture: httpx's
+// testdata/route_grammar.golden is kept byte-identical in
+// generate/http/testdata/golden/route_grammar.golden, and both repositories
+// test their implementation against it, so change httpx first and copy the file
+// verbatim. The per-adapter behavior quoted in the violation details was
+// measured against the httpx v0.0.6 adapters.
 
 // RouteViolationKind classifies the ways a route can fall outside the grammar.
 type RouteViolationKind int

@@ -1,6 +1,8 @@
 package parser
 
 import (
+	"os"
+	"slices"
 	"strings"
 	"testing"
 )
@@ -215,5 +217,67 @@ func TestRouteViolationKindNames(t *testing.T) {
 	}
 	if got := RouteViolationKind(0).String(); got != "unknown(0)" {
 		t.Errorf("zero kind String() = %q, want %q", got, "unknown(0)")
+	}
+}
+
+// routeGrammarFixture is the httpx fixture, kept byte-identical here; httpx is
+// its source of truth.
+const routeGrammarFixture = "../../http/testdata/golden/route_grammar.golden"
+
+// fixtureKinds maps each invalid fixture category to the violation kind that
+// reports it.
+var fixtureKinds = map[string]RouteViolationKind{
+	"not-segment-start": RouteViolationWildcardMidSegment,
+	"not-final":         RouteViolationWildcardNotFinal,
+	"multiple":          RouteViolationExtraWildcard,
+	"anonymous":         RouteViolationUnnamedWildcard,
+}
+
+// TestRouteViolationsGrammarFixture runs the cases httpx.ValidateWildcardPath
+// accepts and rejects through RouteViolations: a valid path reports nothing,
+// and an invalid one reports at least the kind of its category (a path may
+// break several rules at once).
+func TestRouteViolationsGrammarFixture(t *testing.T) {
+	data, err := os.ReadFile(routeGrammarFixture)
+	if err != nil {
+		t.Fatal(err)
+	}
+	n := 0
+	for line := range strings.SplitSeq(string(data), "\n") {
+		if line == "" || strings.HasPrefix(line, "#") {
+			continue
+		}
+		fields := strings.SplitN(line, " ", 3)
+		if len(fields) != 3 || (fields[0] != "valid" && fields[0] != "invalid") {
+			t.Fatalf("malformed fixture line %q", line)
+		}
+		n++
+		verdict, category, path := fields[0], fields[1], fields[2]
+		if !strings.HasPrefix(path, "/") {
+			// RouteViolations takes a path already rooted by HTTPRoute, so a
+			// rootless path is outside its input; httpx rejects it, this
+			// generator can never produce it.
+			continue
+		}
+		got := kinds(RouteViolations(path))
+		if verdict == "valid" {
+			if category != "ok" {
+				t.Fatalf("valid case must use category ok, got %q", category)
+			}
+			if len(got) != 0 {
+				t.Errorf("RouteViolations(%q) = %v, want none", path, got)
+			}
+			continue
+		}
+		want, ok := fixtureKinds[category]
+		if !ok {
+			t.Fatalf("fixture category %q has no violation kind", category)
+		}
+		if !slices.Contains(got, want) {
+			t.Errorf("RouteViolations(%q) = %v, want it to include %v", path, got, want)
+		}
+	}
+	if n == 0 {
+		t.Fatal("route grammar fixture is empty")
 	}
 }
