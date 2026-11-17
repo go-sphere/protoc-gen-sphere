@@ -56,10 +56,15 @@ managed:
       module: buf.build/googleapis/googleapis
     - file_option: go_package_prefix
       module: buf.build/bufbuild/protovalidate
+    - file_option: go_package_prefix
+      module: buf.build/go-sphere/binding
   override:
     - file_option: go_package_prefix
       value: github.com/go-sphere/sphere-layout/api
 plugins:
+  - local: protoc-gen-go
+    out: api
+    opt: paths=source_relative
   - local: protoc-gen-sphere
     out: api
     opt:
@@ -69,7 +74,7 @@ plugins:
 
 ## Prerequisites
 
-You need to have the following dependencies in your project. Add them to your `buf.yaml`:
+You need to have the following protobuf dependencies in your `buf.yaml`:
 
 ```yaml
 deps:
@@ -77,6 +82,14 @@ deps:
   - buf.build/bufbuild/protovalidate
   - buf.build/go-sphere/binding
 ```
+
+With the default type flags, the generated `.sphere.pb.go` code imports the following Go runtime packages in your Go module:
+
+- `github.com/go-sphere/httpx` (`Router`, `Context`, `Handler`, and `BadRequestError`)
+- `github.com/go-sphere/sphere/server/httpz` (from module `github.com/go-sphere/sphere`: `DataResponse`, `ErrorResponse`, `WithJson`, `WithSSE`, `SSEStream`)
+- `buf.build/go/protovalidate` (imported when generated handlers validate requests with `buf.validate`)
+
+If you override the type flags (`router_type`, `context_type`, `handler_type`, `data_resp_type`, `error_resp_type`, `server_handler_func`, `stream_handler_func`, `stream_type`), replace the corresponding runtime packages with your own.
 
 ## Proto Definition Example
 
@@ -265,12 +278,12 @@ func main() {
 
 ## Features
 
-- **Automatic HTTP Handler Generation**: Creates Gin handlers from protobuf service definitions
+- **Automatic HTTP Handler Generation**: Creates `httpx` handlers from protobuf service definitions
 - **Request Binding**: Automatically binds JSON body, query parameters, and URI parameters
 - **Validation Integration**: Integrates with `protovalidate` for request validation
-- **Proto3 Optional Support**: Correctly handles `optional` keyword for query, path, and header parameters in Swagger documentation
+- **Proto3 Optional Support**: Correctly handles `optional` keyword for query, header, and form parameters in Swagger documentation (path parameters are always `required=true` per OpenAPI 2.0)
 - **Swagger Documentation**: Generates Swagger/OpenAPI comments for each endpoint with accurate required/optional field markers
-- **Response Body Customization**: Supports custom response body fields via `response_body` option, including nested arrays and maps
+- **Response Body Customization**: Supports custom top-level response body fields via `response_body` option, including repeated, map, and `optional` fields
 - **Flexible Binding**: Works with sphere binding annotations for fine-grained control
 - **Error Handling**: Integrates with sphere error handling framework with proper error propagation
 - **Route Constants**: Generates operation constants and endpoint arrays for easy reference
@@ -278,11 +291,11 @@ func main() {
 
 Swagger annotations are synthesized through a typed intermediate representation
 (`generate/internal/swagspec`) that validates each operation before rendering:
-a POST/PUT/PATCH without a declared `body` documents no request body, form-bound
-fields on GET/DELETE/HEAD/OPTIONS are documented as query parameters (matching
-the runtime binding), and parameter arrays stay within swag's primitive-array
-grammar — repeated enums render as `[]integer` so the docs never depend on swag
-being able to resolve the enum's Go package.
+a POST/PUT/PATCH without a declared `body` documents no request body, `body` and
+`formData` are rejected on `GET`/`DELETE`/`HEAD`/`OPTIONS`, and parameter arrays
+stay within swag's primitive-array grammar — repeated enums render as
+`[]integer` so the docs never depend on swag being able to resolve the enum's Go
+package.
 
 ## Server-Streaming Methods
 
@@ -444,8 +457,8 @@ enforce it with a validation rule. Response messages may contain oneofs.
 
 The plugin correctly handles proto3 `optional` keyword:
 
-- **Query/Header parameters**: `optional` fields are marked as `required=false` in Swagger (default behavior)
-- **Path parameters**: `optional` fields are marked as `required=false` in Swagger (though path params are typically required)
+- **Query/Header/Form parameters**: `optional` fields are marked as `required=false` in Swagger (default behavior)
+- **Path parameters**: always marked as `required=true` in Swagger (OpenAPI 2.0 requires path parameters to be mandatory, even when the proto field uses `optional`)
 - **Validation integration**: Works seamlessly with `buf.validate` constraints - if a field has `(buf.validate.field).required = true`, it will be marked as required regardless of the `optional` keyword
 
 Example:

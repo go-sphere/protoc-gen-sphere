@@ -32,8 +32,9 @@ fmt:
 	$(GO) fmt ./...
 	$(GOLANGCI_LINT) fmt --no-config --enable gofmt --enable goimports
 
-# Compile the test fixtures into committed descriptor sets. Only this target
-# needs buf; `go test` runs against the committed *.pb files.
+# Compile the test fixtures into gitignored descriptor sets under $(TESTDATA)/pb.
+# `make test` and `make update-golden` run this target via buf before invoking
+# `go test`.
 #
 # buf resolves dependencies from $(TESTDATA)/buf.lock (no vendored protos),
 # emits a FileDescriptorSet that bundles every import (so protogen can resolve

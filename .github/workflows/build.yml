@@ -18,8 +18,9 @@ jobs:
         with:
           go-version-file: go.mod
           cache-dependency-path: "**/go.sum"
-      # Only buf is needed: make testdata compiles the fixtures into committed
-      # descriptor sets, and the tests run the generator in-process.
+      # Only buf is needed: make testdata compiles the fixtures into gitignored
+      # descriptor sets under generate/http/testdata/pb, and the tests run the
+      # generator in-process.
       - name: Install Buf
         env:
           GOTOOLCHAIN: auto
@@ -31,7 +32,7 @@ jobs:
         run: make build
       - name: Test
         run: make test
-      # Rebuilding the fixtures must not change anything that is committed
-      # (descriptor sets and golden files).
+      # Rebuilding the fixtures and running tests must not change any committed
+      # files (e.g. golden files).
       - name: Verify generated files
         run: git diff --exit-code
