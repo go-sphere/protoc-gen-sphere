@@ -27,7 +27,7 @@ func requestNeedsValidate(msg *protogen.Message) bool {
 }
 
 func messageHasValidate(msg *protogen.Message, seen map[string]struct{}) bool {
-	if msg == nil {
+	if msg == nil || msg.Desc.ParentFile().Package() == "google.protobuf" {
 		return false
 	}
 	key := string(msg.Desc.FullName())

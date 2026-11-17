@@ -87,7 +87,8 @@ func TestBindingLocationKindValidation(t *testing.T) {
 			name:   "nested body path",
 			method: "NestedBody",
 			invoke: func(method *protogen.Method) error {
-				return checkTopLevelField(method, method.Input, "body", "inner.a")
+				_, err := checkTopLevelField(method, method.Input, "body", "inner.a")
+				return err
 			},
 			wantErr: "method `InvalidService.NestedBody` body `inner.a` is a nested field path; google.api.http requires a top-level field of message `BodyFieldRequest`. File: `invalid_binding.proto`",
 		},
@@ -95,7 +96,8 @@ func TestBindingLocationKindValidation(t *testing.T) {
 			name:   "unknown body field",
 			method: "UnknownBody",
 			invoke: func(method *protogen.Method) error {
-				return checkTopLevelField(method, method.Input, "body", "missing")
+				_, err := checkTopLevelField(method, method.Input, "body", "missing")
+				return err
 			},
 			wantErr: "method `InvalidService.UnknownBody` body `missing` is not a field of message `BodyFieldRequest`. File: `invalid_binding.proto`",
 		},
@@ -103,7 +105,8 @@ func TestBindingLocationKindValidation(t *testing.T) {
 			name:   "nested response_body path",
 			method: "NestedResponseBody",
 			invoke: func(method *protogen.Method) error {
-				return checkTopLevelField(method, method.Output, "response_body", "inner.a")
+				_, err := checkTopLevelField(method, method.Output, "response_body", "inner.a")
+				return err
 			},
 			wantErr: "method `InvalidService.NestedResponseBody` response_body `inner.a` is a nested field path; google.api.http requires a top-level field of message `NestedResponse`. File: `invalid_binding.proto`",
 		},
@@ -116,6 +119,15 @@ func TestBindingLocationKindValidation(t *testing.T) {
 				return warnFieldsOutsideBody(method, "inner", &fileConfig{failOnWarn: true})
 			},
 			wantErr: "method `InvalidService.FieldsOutsideBody` field `version` is bound to the JSON body, but body is `inner`, so the field is never bound; give it a QUERY, URI or HEADER location, or use body: \"*\". File: `invalid_binding.proto`, Message: `BodyFieldRequest`",
+		},
+		{
+			name:   "oneof member in response_body",
+			method: "OneofResponseBody",
+			invoke: func(method *protogen.Method) error {
+				_, err := checkTopLevelField(method, method.Output, "response_body", "text")
+				return err
+			},
+			wantErr: "method `InvalidService.OneofResponseBody` response_body `text` selects a member of oneof `kind` in message `WithOneof`, which cannot be projected directly. File: `invalid_binding.proto`",
 		},
 	}
 	for _, tt := range tests {
@@ -201,4 +213,17 @@ func TestURIParamsUnmatchedRouteParam(t *testing.T) {
 	if got := err.Error(); got != want {
 		t.Errorf("error = %q, want %q", got, want)
 	}
+
+	t.Run("multiple unmatched params sorted deterministically", func(t *testing.T) {
+		for range 10 {
+			_, err := parser.URIParams(getItem, "/v1/users/:z_param/items/:a_param")
+			if err == nil {
+				t.Fatal("expected error for unmatched params")
+			}
+			wantSorted := "method `NoBodyService.GetItem` route `/v1/users/:z_param/items/:a_param` has parameter `a_param` that does not match a top-level request field. Nested path variables such as {user.id} are not supported; declare a top-level field and mark it BINDING_LOCATION_URI. File: `no_body.proto`, Message: `GetItemRequest`"
+			if got := err.Error(); got != wantSorted {
+				t.Fatalf("error = %q, want %q", got, wantSorted)
+			}
+		}
+	})
 }

@@ -19,9 +19,9 @@ type {{.ServiceType}}HTTPServer interface {
 	{{.Comment}}
 	{{- end}}
 	{{- if .IsServerStream}}
-	{{.Name}}(context.Context, *{{.Request}}, func({{.Response}}) error) error
+	{{.Name}}({{or $packageDesc.StdContextType "context.Context"}}, *{{.Request}}, func({{.Response}}) error) error
 	{{- else}}
-	{{.Name}}(context.Context, *{{.Request}}) (*{{.Reply}}, error)
+	{{.Name}}({{or $packageDesc.StdContextType "context.Context"}}, *{{.Request}}) (*{{.Reply}}, error)
 	{{- end}}
 {{- end}}
 }

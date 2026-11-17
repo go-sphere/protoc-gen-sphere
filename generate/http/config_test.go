@@ -20,6 +20,13 @@ func TestParseGoIdent(t *testing.T) {
 		{name: "multiple separators", input: "github.com/example/project/pkg;Message;Other", wantErr: true},
 		{name: "empty import path", input: ";Message", wantErr: true},
 		{name: "empty identifier", input: "github.com/example/project/pkg;", wantErr: true},
+		{name: "identifier with space", input: "github.com/example/project/pkg;Bad Ident", wantErr: true},
+		{name: "identifier starting with digit", input: "github.com/example/project/pkg;123Bad", wantErr: true},
+		{name: "identifier is Go keyword", input: "github.com/example/project/pkg;func", wantErr: true},
+		{name: "import path with space", input: "github.com/example/my pkg;Message", wantErr: true},
+		{name: "import path with newline", input: "github.com/example/pkg\n;Message", wantErr: true},
+		{name: "import path with double quote", input: `github.com/example/"pkg";Message`, wantErr: true},
+		{name: "import path with backtick", input: "github.com/example/`pkg`;Message", wantErr: true},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {

@@ -28,8 +28,8 @@ type SwagParams struct {
 	FormVars   []ParamsField
 	HeaderVars []ParamsField
 
-	Body         string
-	ResponseBody string
+	Body         *protogen.Field
+	ResponseBody *protogen.Field
 
 	DataResponse  string
 	ErrorResponse string
@@ -52,10 +52,7 @@ var NoBodyMethods = map[string]struct{}{
 // owner and invalid combinations fail generation instead of producing
 // misleading docs.
 func BuildAnnotations(g *GeneratedFile, m *protogen.Method, config *SwagParams) (string, error) {
-	op, err := buildOperation(g, m, config)
-	if err != nil {
-		return "", err
-	}
+	op := buildOperation(g, m, config)
 	block, err := op.Render()
 	if err != nil {
 		return "", fmt.Errorf("method `%s.%s`: %w",
@@ -64,14 +61,16 @@ func BuildAnnotations(g *GeneratedFile, m *protogen.Method, config *SwagParams) 
 	return block, nil
 }
 
-func buildOperation(g *GeneratedFile, m *protogen.Method, config *SwagParams) (*swagspec.Operation, error) {
+func buildOperation(g *GeneratedFile, m *protogen.Method, config *SwagParams) *swagspec.Operation {
 	pkgName := string(m.Parent.Desc.ParentFile().Package())
+	svcName := string(m.Parent.Desc.Name())
+	tags := []string{pkgName, pkgName + "." + svcName}
+	if pkgName == "" {
+		tags = []string{svcName}
+	}
 	op := &swagspec.Operation{
-		Summary: string(m.Desc.Name()),
-		Tags: []string{
-			pkgName,
-			pkgName + "." + string(m.Parent.Desc.Name()),
-		},
+		Summary:      string(m.Desc.Name()),
+		Tags:         tags,
 		Accept:       "json",
 		Produce:      "json",
 		RouterPath:   config.Path,
@@ -81,7 +80,9 @@ func buildOperation(g *GeneratedFile, m *protogen.Method, config *SwagParams) (*
 		op.Description = desc
 	}
 	if strings.TrimSpace(config.Auth) != "" {
-		op.RawLines = strings.Split(strings.TrimRight(config.Auth, "\n"), "\n")
+		auth := strings.ReplaceAll(config.Auth, "\r\n", "\n")
+		auth = strings.ReplaceAll(auth, "\r", "")
+		op.RawLines = strings.Split(strings.TrimRight(auth, "\n"), "\n")
 	}
 	if config.Stream {
 		op.Produce = "text/event-stream"
@@ -104,10 +105,9 @@ func buildOperation(g *GeneratedFile, m *protogen.Method, config *SwagParams) (*
 			Name:     param.Name,
 			In:       swagspec.LocationPath,
 			Type:     pathParamSwaggerType(g, param.Field),
-			Required: isFieldRequired(param.Field, true),
-			// swagspec rejects optional path params: OpenAPI 2.0 requires
-			// path parameters to be mandatory and the router cannot match
-			// the route without them anyway.
+			Required: true,
+			// OpenAPI 2.0 requires path parameters to be mandatory and the
+			// router cannot match the route without them anyway.
 			Description: param.Name,
 		})
 	}
@@ -122,10 +122,7 @@ func buildOperation(g *GeneratedFile, m *protogen.Method, config *SwagParams) (*
 	// form-bound requests have no JSON body (OpenAPI 2.0 makes body and
 	// formData mutually exclusive), and no-body methods decode nothing.
 	if config.HasBody && !noBody && len(config.FormVars) == 0 {
-		bodyType, err := buildSwaggerParamTypeByPath(g, m, m.Input, config.Body)
-		if err != nil {
-			return nil, err
-		}
+		bodyType := swaggerMessageOrFieldType(g, m.Input, config.Body)
 		op.Params = append(op.Params, swagspec.Param{
 			Name:        "request",
 			In:          swagspec.LocationBody,
@@ -143,10 +140,7 @@ func buildOperation(g *GeneratedFile, m *protogen.Method, config *SwagParams) (*
 	}
 
 	// Add a response body.
-	responseType, err := buildSwaggerParamTypeByPath(g, m, m.Output, config.ResponseBody)
-	if err != nil {
-		return nil, err
-	}
+	responseType := swaggerMessageOrFieldType(g, m.Output, config.ResponseBody)
 	if config.Stream {
 		// Swagger has no event-stream concept; document the per-event message
 		// type instead of pretending there is a DataResponse envelope.
@@ -165,7 +159,7 @@ func buildOperation(g *GeneratedFile, m *protogen.Method, config *SwagParams) (*
 		Codes: []string{"400", "401", "403", "500", "default"},
 		Type:  config.ErrorResponse,
 	}
-	return op, nil
+	return op
 }
 
 // pathParamSwaggerType renders the Swagger type of a single path token. URI
@@ -183,30 +177,20 @@ func isNoBodyMethod(method string) bool {
 	return ok
 }
 
-func buildSwaggerParamTypeByPath(g *GeneratedFile, m *protogen.Method, message *protogen.Message, path string) (string, error) {
-	name := g.QualifiedGoIdent(message.GoIdent)
-	if path != "" {
-		field := ProtoKeyPathToField(message, strings.Split(path, "."))
-		if field == nil {
-			return "", fmt.Errorf("method `%s.%s` field `%s` not found in message `%s`. File: `%s`",
-				m.Parent.Desc.Name(),
-				m.Desc.Name(),
-				path,
-				message.Desc.Name(),
-				m.Parent.Location.SourceFile,
-			)
-		} else {
-			name = ProtoTypeToSwaggerType(g, field)
-		}
+func swaggerMessageOrFieldType(g *GeneratedFile, message *protogen.Message, field *protogen.Field) string {
+	if field != nil {
+		return ProtoTypeToSwaggerType(g, field)
 	}
-	return name, nil
+	return g.QualifiedGoIdent(message.GoIdent)
 }
 
 // swaggerDescription collapses a method's leading proto comment into a single
 // comma-separated line suitable for a Swagger @Description. Empty input yields
 // an empty string.
 func swaggerDescription(leading string) string {
-	desc := strings.TrimSpace(leading)
+	desc := strings.ReplaceAll(leading, "\r\n", "\n")
+	desc = strings.ReplaceAll(desc, "\r", "")
+	desc = strings.TrimSpace(desc)
 	if desc == "" {
 		return ""
 	}
@@ -214,18 +198,19 @@ func swaggerDescription(leading string) string {
 }
 
 func isFieldRequired(field *protogen.Field, defaultRequired bool) bool {
-	// If field has optional keyword, it's not required
-	if field.Desc.HasOptionalKeyword() {
-		return false
-	}
-
-	// Check buf.validate required constraint
+	// Check buf.validate required constraint first so an explicit required=true
+	// rule overrides proto3 optional and defaultRequired.
 	opts := field.Desc.Options()
 	if opts != nil && proto.HasExtension(opts, validatepb.E_Field) {
 		fieldConstraints := proto.GetExtension(opts, validatepb.E_Field).(*validatepb.FieldRules)
-		if fieldConstraints != nil {
-			return fieldConstraints.GetRequired()
+		if fieldConstraints != nil && fieldConstraints.GetRequired() {
+			return true
 		}
+	}
+
+	// If field has optional keyword, it's not required
+	if field.Desc.HasOptionalKeyword() {
+		return false
 	}
 
 	// Return default value based on parameter type

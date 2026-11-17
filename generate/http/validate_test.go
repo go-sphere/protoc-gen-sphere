@@ -41,3 +41,19 @@ func TestRequestNeedsValidateNested(t *testing.T) {
 		t.Error("message without rules should not need validate")
 	}
 }
+
+func TestRequestNeedsValidateSkipsWellKnownProtobuf(t *testing.T) {
+	set := testutil.LoadDescriptorSet(t, "testdata/pb/integration.pb")
+	plugin := testutil.MustCreatePlugin(t, set, "integration.proto")
+	file := testutil.FileToGenerate(t, plugin)
+
+	for _, m := range file.Messages {
+		if m.GoIdent.GoName == "CreateItemRequest" {
+			if requestNeedsValidate(m) {
+				t.Error("CreateItemRequest with google.protobuf.Timestamp should not need validate")
+			}
+			return
+		}
+	}
+	t.Fatal("CreateItemRequest not found")
+}

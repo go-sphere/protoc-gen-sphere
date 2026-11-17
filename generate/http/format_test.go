@@ -62,8 +62,10 @@ func TestFormatMethodComment(t *testing.T) {
 		want    string
 	}{
 		{"empty", "RunTest", "", ""},
+		{"whitespace only", "RunTest", "  \r\n\t ", ""},
 		{"single line", "RunTest", " does a thing\n", "// RunTest does a thing"},
 		{"multi line", "RunTest", "line1\nline2\nline3\n", "// RunTest line1\n// line2\n// line3"},
+		{"crlf multi line", "RunTest", "line1\r\nline2\r\n", "// RunTest line1\n// line2"},
 		{"blank interior lines skipped", "RunTest", "line1\n\nline2\n", "// RunTest line1\n// line2"},
 	}
 	for _, tt := range tests {

@@ -3,7 +3,9 @@ package http
 import (
 	"errors"
 	"fmt"
+	"go/token"
 	"strings"
+	"unicode"
 
 	"github.com/go-sphere/protoc-gen-sphere/generate/internal/template"
 	"google.golang.org/protobuf/compiler/protogen"
@@ -99,6 +101,12 @@ func ParseGoIdent(raw string) (protogen.GoIdent, error) {
 	importPath, goName, ok := strings.Cut(raw, ";")
 	if !ok || importPath == "" || goName == "" || strings.Contains(goName, ";") {
 		return protogen.GoIdent{}, errors.New("invalid GoIdent format, expected 'import/path;Ident'")
+	}
+	if strings.ContainsFunc(importPath, unicode.IsSpace) || strings.ContainsAny(importPath, "\"`") {
+		return protogen.GoIdent{}, fmt.Errorf("invalid import path %q in GoIdent", importPath)
+	}
+	if !token.IsIdentifier(goName) || token.Lookup(goName).IsKeyword() {
+		return protogen.GoIdent{}, fmt.Errorf("invalid Go identifier %q in GoIdent", goName)
 	}
 	return protogen.GoIdent{
 		GoName:       goName,

@@ -82,6 +82,7 @@ func TestValidateRejectsInvalidOperations(t *testing.T) {
 		{"bad router method", func(o *Operation) { o.RouterMethod = "GET ALL" }, "valid verb"},
 		{"empty tag", func(o *Operation) { o.Tags = []string{"", "svc"} }, "empty"},
 		{"raw line without comment prefix", func(o *Operation) { o.RawLines = []string{"@Security x"} }, `must start with //`},
+		{"raw line with carriage return", func(o *Operation) { o.RawLines = []string{"// @Security x\r"} }, "newline"},
 		{"empty response type", func(o *Operation) { o.Success.Type = "" }, "require a type"},
 		{"bad response code", func(o *Operation) { o.Failure.Codes = []string{"4xx"} }, "numeric"},
 		{"no response code", func(o *Operation) { o.Failure.Codes = nil }, "at least one status code"},

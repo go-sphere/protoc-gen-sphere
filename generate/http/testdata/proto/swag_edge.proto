@@ -67,6 +67,33 @@ service SwagEdgeService {
   rpc EnumListQuery(EnumListQueryRequest) returns (EnumQueryResponse) {
     option (google.api.http) = {get: "/api/swag/enum-list"};
   }
+
+  // OptionalScalarResponseBody projects the response onto a proto3 optional
+  // string field, which protoc-gen-go generates as *string.
+  rpc OptionalScalarResponseBody(OptionalScalarResponseBodyRequest) returns (OptionalScalarResponseBodyResponse) {
+    option (google.api.http) = {
+      get: "/api/swag/optional-scalar-response"
+      response_body: "token"
+    };
+  }
+
+  // OptionalEnumResponseBody projects the response onto a proto3 optional enum
+  // field, which protoc-gen-go generates as *EdgeStatus.
+  rpc OptionalEnumResponseBody(OptionalEnumResponseBodyRequest) returns (OptionalEnumResponseBodyResponse) {
+    option (google.api.http) = {
+      get: "/api/swag/optional-enum-response"
+      response_body: "status"
+    };
+  }
+
+  // OptionalBytesResponseBody projects the response onto a proto3 optional
+  // bytes field, which protoc-gen-go keeps as []byte (not *[]byte).
+  rpc OptionalBytesResponseBody(OptionalBytesResponseBodyRequest) returns (OptionalBytesResponseBodyResponse) {
+    option (google.api.http) = {
+      get: "/api/swag/optional-bytes-response"
+      response_body: "data"
+    };
+  }
 }
 
 message NoBodyPostRequest {
@@ -141,4 +168,22 @@ message EnumListQueryRequest {
 enum EdgeStatus {
   EDGE_STATUS_UNSPECIFIED = 0;
   EDGE_STATUS_ON = 1;
+}
+
+message OptionalScalarResponseBodyRequest {}
+
+message OptionalScalarResponseBodyResponse {
+  optional string token = 1;
+}
+
+message OptionalEnumResponseBodyRequest {}
+
+message OptionalEnumResponseBodyResponse {
+  optional EdgeStatus status = 1;
+}
+
+message OptionalBytesResponseBodyRequest {}
+
+message OptionalBytesResponseBodyResponse {
+  optional bytes data = 1;
 }

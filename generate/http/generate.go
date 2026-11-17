@@ -67,14 +67,15 @@ func generateFileContent(plugin *protogen.Plugin, file *protogen.File, gen *prot
 	}
 
 	fileGen := parser.NewGen(gen)
-	fileGen.QualifiedGoIdent(contextPackage.Ident("Context"))
+	stdContextType := fileGen.QualifiedGoIdent(contextPackage.Ident("Context"))
 	pkgDesc := &template.PackageDesc{
-		RouterType:  fileGen.QualifiedGoIdent(cfg.RouterType),
-		ContextType: fileGen.QualifiedGoIdent(cfg.ContextType),
-		HandlerType: fileGen.QualifiedGoIdent(cfg.HandlerType),
+		RouterType:     fileGen.QualifiedGoIdent(cfg.RouterType),
+		ContextType:    fileGen.QualifiedGoIdent(cfg.ContextType),
+		HandlerType:    fileGen.QualifiedGoIdent(cfg.HandlerType),
+		StdContextType: stdContextType,
 
 		ErrorResponseType: fileGen.QualifiedGoIdent(cfg.ErrorRespType),
-		DataResponseType:  gen.QualifiedGoIdent(cfg.DataRespType),
+		DataResponseType:  fileGen.QualifiedUsedGoIdent(cfg.DataRespType),
 
 		ContextLoadFunc: cfg.ContextLoadFunc,
 	}
@@ -84,11 +85,11 @@ func generateFileContent(plugin *protogen.Plugin, file *protogen.File, gen *prot
 		swaggerAuth:     cfg.SwaggerAuth,
 		failOnWarn:      cfg.FailOnWarn,
 		packageDesc:     pkgDesc,
-		// The unary wrapper is qualified eagerly (collectGoImport keeps its
-		// import alive); the stream idents are qualified lazily in
-		// buildMethodDesc so files without streaming methods do not import
-		// their packages.
-		serverHandlerFunc: gen.QualifiedGoIdent(cfg.ServerHandlerFunc),
+		// The unary wrapper is qualified with QualifiedUsedGoIdent (collectGoImport
+		// keeps its import alive when no unary method uses it); stream idents
+		// stay unqualified until a server-streaming method needs them, so files
+		// without streams do not import their packages.
+		serverHandlerFunc: fileGen.QualifiedUsedGoIdent(cfg.ServerHandlerFunc),
 		streamHandlerFunc: cfg.StreamHandlerFunc,
 		streamType:        cfg.StreamType,
 		methodSets:        make(map[string]int),
@@ -107,7 +108,7 @@ func generateFileContent(plugin *protogen.Plugin, file *protogen.File, gen *prot
 		}
 		services = append(services, sd)
 	}
-	importLines := collectGoImport(file, fileGen, cfg, fileCfg)
+	importLines := collectGoImport(file, fileGen, cfg, fileCfg, services)
 	for _, line := range importLines {
 		gen.P(line)
 	}

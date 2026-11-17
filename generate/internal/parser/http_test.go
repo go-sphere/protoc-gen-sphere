@@ -73,6 +73,22 @@ func TestParseHttpRule(t *testing.T) {
 			wantMethod: "OPTIONS",
 		},
 		{
+			name: "custom lowercase normalized to uppercase",
+			rule: &annotations.HttpRule{Pattern: &annotations.HttpRule_Custom{
+				Custom: &annotations.CustomHttpPattern{Kind: "options", Path: "/a"},
+			}},
+			wantPath:   "/a",
+			wantMethod: http.MethodOptions,
+		},
+		{
+			name: "custom arbitrary lowercase verb normalized",
+			rule: &annotations.HttpRule{Pattern: &annotations.HttpRule_Custom{
+				Custom: &annotations.CustomHttpPattern{Kind: "link", Path: "/a"},
+			}},
+			wantPath:   "/a",
+			wantMethod: "LINK",
+		},
+		{
 			name:             "response body star is normalized to empty",
 			rule:             &annotations.HttpRule{Pattern: &annotations.HttpRule_Get{Get: "/a"}, ResponseBody: "*"},
 			wantPath:         "/a",

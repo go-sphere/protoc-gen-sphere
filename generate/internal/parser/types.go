@@ -17,23 +17,26 @@ func ProtoTypeToGoType(g *GeneratedFile, field *protogen.Field, usePtrForMessage
 		keyField := field.Message.Fields[0]
 		valField := field.Message.Fields[1]
 		key := singularProtoTypeToGoType(g, keyField, false) // map keys are never pointers
-
-		// Handle map value - could be message, list, or scalar
-		var val string
-		if valField.Desc.IsList() {
-			// map value is an array: map[string][]Type
-			elemType := singularProtoTypeToGoType(g, valField, usePtrForMessage)
-			val = fmt.Sprintf("[]%s", elemType)
-		} else {
-			val = singularProtoTypeToGoType(g, valField, usePtrForMessage)
-		}
+		val := singularProtoTypeToGoType(g, valField, usePtrForMessage)
 		return fmt.Sprintf("map[%s]%s", key, val)
 	case field.Desc.IsList():
 		// For repeated fields, always use pointer for message types
 		elemType := singularProtoTypeToGoType(g, field, true)
 		return fmt.Sprintf("[]%s", elemType)
 	default:
-		return singularProtoTypeToGoType(g, field, usePtrForMessage)
+		typ := singularProtoTypeToGoType(g, field, usePtrForMessage)
+		// Proto3 optional / proto2 presence scalars and enums are emitted as
+		// pointers by protoc-gen-go; bytes stays []byte and messages obey
+		// usePtrForMessage. Real oneof members are held inside wrapper structs,
+		// not direct pointer fields.
+		if field.Desc.HasPresence() &&
+			field.Desc.Kind() != protoreflect.MessageKind &&
+			field.Desc.Kind() != protoreflect.GroupKind &&
+			field.Desc.Kind() != protoreflect.BytesKind &&
+			(field.Oneof == nil || field.Oneof.Desc.IsSynthetic()) {
+			return "*" + typ
+		}
+		return typ
 	}
 }
 

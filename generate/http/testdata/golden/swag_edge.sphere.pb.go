@@ -27,6 +27,9 @@ const OperationSwagEdgeServiceMapResponseBody = "/testdata.swag.v1.SwagEdgeServi
 const OperationSwagEdgeServiceListResponseBody = "/testdata.swag.v1.SwagEdgeService/ListResponseBody"
 const OperationSwagEdgeServiceEnumQuery = "/testdata.swag.v1.SwagEdgeService/EnumQuery"
 const OperationSwagEdgeServiceEnumListQuery = "/testdata.swag.v1.SwagEdgeService/EnumListQuery"
+const OperationSwagEdgeServiceOptionalScalarResponseBody = "/testdata.swag.v1.SwagEdgeService/OptionalScalarResponseBody"
+const OperationSwagEdgeServiceOptionalEnumResponseBody = "/testdata.swag.v1.SwagEdgeService/OptionalEnumResponseBody"
+const OperationSwagEdgeServiceOptionalBytesResponseBody = "/testdata.swag.v1.SwagEdgeService/OptionalBytesResponseBody"
 
 var EndpointsSwagEdgeService = [...][3]string{
 	{OperationSwagEdgeServiceNoBodyPost, "POST", "/api/swag/post"},
@@ -38,6 +41,9 @@ var EndpointsSwagEdgeService = [...][3]string{
 	{OperationSwagEdgeServiceListResponseBody, "GET", "/api/swag/list-response"},
 	{OperationSwagEdgeServiceEnumQuery, "GET", "/api/swag/enum"},
 	{OperationSwagEdgeServiceEnumListQuery, "GET", "/api/swag/enum-list"},
+	{OperationSwagEdgeServiceOptionalScalarResponseBody, "GET", "/api/swag/optional-scalar-response"},
+	{OperationSwagEdgeServiceOptionalEnumResponseBody, "GET", "/api/swag/optional-enum-response"},
+	{OperationSwagEdgeServiceOptionalBytesResponseBody, "GET", "/api/swag/optional-bytes-response"},
 }
 
 type SwagEdgeServiceHTTPServer interface {
@@ -62,6 +68,15 @@ type SwagEdgeServiceHTTPServer interface {
 	// accepts primitive arrays in parameters, so the elements must render as
 	// their underlying scalar.
 	EnumListQuery(context.Context, *EnumListQueryRequest) (*EnumQueryResponse, error)
+	// OptionalScalarResponseBody OptionalScalarResponseBody projects the response onto a proto3 optional
+	// string field, which protoc-gen-go generates as *string.
+	OptionalScalarResponseBody(context.Context, *OptionalScalarResponseBodyRequest) (*OptionalScalarResponseBodyResponse, error)
+	// OptionalEnumResponseBody OptionalEnumResponseBody projects the response onto a proto3 optional enum
+	// field, which protoc-gen-go generates as *EdgeStatus.
+	OptionalEnumResponseBody(context.Context, *OptionalEnumResponseBodyRequest) (*OptionalEnumResponseBodyResponse, error)
+	// OptionalBytesResponseBody OptionalBytesResponseBody projects the response onto a proto3 optional
+	// bytes field, which protoc-gen-go keeps as []byte (not *[]byte).
+	OptionalBytesResponseBody(context.Context, *OptionalBytesResponseBodyRequest) (*OptionalBytesResponseBodyResponse, error)
 }
 
 // @Summary NoBodyPost
@@ -273,6 +288,66 @@ func _SwagEdgeService_EnumListQuery0_HTTP_Handler(srv SwagEdgeServiceHTTPServer)
 	})
 }
 
+// @Summary OptionalScalarResponseBody
+// @Description OptionalScalarResponseBody projects the response onto a proto3 optional, string field, which protoc-gen-go generates as *string.
+// @Tags testdata.swag.v1,testdata.swag.v1.SwagEdgeService
+// @Accept json
+// @Produce json
+// @Param Authorization header string false "Bearer token"
+// @Success 200 {object} httpz.DataResponse[string]
+// @Failure 400,401,403,500,default {object} httpz.ErrorResponse
+// @Router /api/swag/optional-scalar-response [get]
+func _SwagEdgeService_OptionalScalarResponseBody0_HTTP_Handler(srv SwagEdgeServiceHTTPServer) httpx.Handler {
+	return httpz.WithJson(func(ctx httpx.Context) (*string, error) {
+		var in OptionalScalarResponseBodyRequest
+		out, err := srv.OptionalScalarResponseBody(ctx.Context(), &in)
+		if err != nil {
+			return nil, err
+		}
+		return out.Token, nil
+	})
+}
+
+// @Summary OptionalEnumResponseBody
+// @Description OptionalEnumResponseBody projects the response onto a proto3 optional enum, field, which protoc-gen-go generates as *EdgeStatus.
+// @Tags testdata.swag.v1,testdata.swag.v1.SwagEdgeService
+// @Accept json
+// @Produce json
+// @Param Authorization header string false "Bearer token"
+// @Success 200 {object} httpz.DataResponse[EdgeStatus]
+// @Failure 400,401,403,500,default {object} httpz.ErrorResponse
+// @Router /api/swag/optional-enum-response [get]
+func _SwagEdgeService_OptionalEnumResponseBody0_HTTP_Handler(srv SwagEdgeServiceHTTPServer) httpx.Handler {
+	return httpz.WithJson(func(ctx httpx.Context) (*EdgeStatus, error) {
+		var in OptionalEnumResponseBodyRequest
+		out, err := srv.OptionalEnumResponseBody(ctx.Context(), &in)
+		if err != nil {
+			return nil, err
+		}
+		return out.Status, nil
+	})
+}
+
+// @Summary OptionalBytesResponseBody
+// @Description OptionalBytesResponseBody projects the response onto a proto3 optional, bytes field, which protoc-gen-go keeps as []byte (not *[]byte).
+// @Tags testdata.swag.v1,testdata.swag.v1.SwagEdgeService
+// @Accept json
+// @Produce json
+// @Param Authorization header string false "Bearer token"
+// @Success 200 {object} httpz.DataResponse[string]
+// @Failure 400,401,403,500,default {object} httpz.ErrorResponse
+// @Router /api/swag/optional-bytes-response [get]
+func _SwagEdgeService_OptionalBytesResponseBody0_HTTP_Handler(srv SwagEdgeServiceHTTPServer) httpx.Handler {
+	return httpz.WithJson(func(ctx httpx.Context) ([]byte, error) {
+		var in OptionalBytesResponseBodyRequest
+		out, err := srv.OptionalBytesResponseBody(ctx.Context(), &in)
+		if err != nil {
+			return nil, err
+		}
+		return out.Data, nil
+	})
+}
+
 func RegisterSwagEdgeServiceHTTPServer(route httpx.Router, srv SwagEdgeServiceHTTPServer) {
 	r := route.Group("/")
 	r.Handle("POST", "/api/swag/post", _SwagEdgeService_NoBodyPost0_HTTP_Handler(srv))
@@ -284,4 +359,7 @@ func RegisterSwagEdgeServiceHTTPServer(route httpx.Router, srv SwagEdgeServiceHT
 	r.Handle("GET", "/api/swag/list-response", _SwagEdgeService_ListResponseBody0_HTTP_Handler(srv))
 	r.Handle("GET", "/api/swag/enum", _SwagEdgeService_EnumQuery0_HTTP_Handler(srv))
 	r.Handle("GET", "/api/swag/enum-list", _SwagEdgeService_EnumListQuery0_HTTP_Handler(srv))
+	r.Handle("GET", "/api/swag/optional-scalar-response", _SwagEdgeService_OptionalScalarResponseBody0_HTTP_Handler(srv))
+	r.Handle("GET", "/api/swag/optional-enum-response", _SwagEdgeService_OptionalEnumResponseBody0_HTTP_Handler(srv))
+	r.Handle("GET", "/api/swag/optional-bytes-response", _SwagEdgeService_OptionalBytesResponseBody0_HTTP_Handler(srv))
 }

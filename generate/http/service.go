@@ -38,25 +38,30 @@ func buildServiceDesc(g *parser.GeneratedFile, service *protogen.Service, cfg *f
 		}
 		rule, ok := proto.GetExtension(method.Desc.Options(), annotations.E_Http).(*annotations.HttpRule)
 		hasRule := rule != nil && ok
-		if hasRule || !cfg.omitEmpty {
-			if err := checkRequestOneof(method); err != nil {
-				return nil, err
-			}
+		if !hasRule && cfg.omitEmpty {
+			continue
+		}
+		if err := checkRequestOneof(method); err != nil {
+			return nil, err
+		}
+		forms, err := parser.FormParams(method)
+		if err != nil {
+			return nil, err
 		}
 		if hasRule {
 			for _, bind := range rule.AdditionalBindings {
-				desc, err := buildHTTPRule(g, service, method, bind, cfg)
+				desc, err := buildHTTPRule(g, service, method, bind, forms, cfg)
 				if err != nil {
 					return nil, err
 				}
 				sd.Methods = append(sd.Methods, desc)
 			}
-			desc, err := buildHTTPRule(g, service, method, rule, cfg)
+			desc, err := buildHTTPRule(g, service, method, rule, forms, cfg)
 			if err != nil {
 				return nil, err
 			}
 			sd.Methods = append(sd.Methods, desc)
-		} else if !cfg.omitEmpty {
+		} else {
 			// Method with no http_rule defined, automatically generating a default POST method.
 			path := defaultHTTPPath(cfg.omitEmptyPrefix, string(service.Desc.FullName()), string(method.Desc.Name()))
 			// Body "" with HasBody mirrors ParseHttpRule's normalization of
@@ -68,7 +73,7 @@ func buildServiceDesc(g *parser.GeneratedFile, service *protogen.Service, cfg *f
 				Body:         "",
 				ResponseBody: "",
 			}
-			desc, err := buildMethodDesc(g, method, res, cfg)
+			desc, err := buildMethodDesc(g, method, res, forms, cfg)
 			if err != nil {
 				return nil, err
 			}
@@ -105,14 +110,10 @@ func checkRequestOneof(method *protogen.Method) error {
 	)
 }
 
-func buildHTTPRule(g *parser.GeneratedFile, service *protogen.Service, method *protogen.Method, rule *annotations.HttpRule, cfg *fileConfig) (*template.MethodDesc, error) {
+func buildHTTPRule(g *parser.GeneratedFile, service *protogen.Service, method *protogen.Method, rule *annotations.HttpRule, forms []parser.ParamsField, cfg *fileConfig) (*template.MethodDesc, error) {
 	res := parser.ParseHttpRule(rule)
 	if res.Path == "" {
 		res.Path = defaultHTTPPath(cfg.omitEmptyPrefix, string(service.Desc.FullName()), string(method.Desc.Name()))
-	}
-	forms, err := parser.FormParams(method)
-	if err != nil {
-		return nil, err
 	}
 	if _, ok := parser.NoBodyMethods[res.Method]; ok {
 		if rule.Body != "" {
@@ -150,14 +151,14 @@ func buildHTTPRule(g *parser.GeneratedFile, service *protogen.Service, method *p
 			return nil, err
 		}
 	}
-	md, err := buildMethodDesc(g, method, res, cfg)
+	md, err := buildMethodDesc(g, method, res, forms, cfg)
 	if err != nil {
 		return nil, err
 	}
 	return md, nil
 }
 
-func buildMethodDesc(g *parser.GeneratedFile, method *protogen.Method, rule *parser.HttpRule, cfg *fileConfig) (*template.MethodDesc, error) {
+func buildMethodDesc(g *parser.GeneratedFile, method *protogen.Method, rule *parser.HttpRule, forms []parser.ParamsField, cfg *fileConfig) (*template.MethodDesc, error) {
 	route, err := parser.HTTPRoute(rule.Path)
 	if err != nil {
 		return nil, fmt.Errorf("method `%s.%s` route `%s` parse error: %v. File: `%s`",
@@ -202,10 +203,12 @@ func buildMethodDesc(g *parser.GeneratedFile, method *protogen.Method, rule *par
 		rule.ResponseBody = ""
 	}
 
-	if err := checkTopLevelField(method, method.Input, "body", rule.Body); err != nil {
+	bodyField, err := checkTopLevelField(method, method.Input, "body", rule.Body)
+	if err != nil {
 		return nil, err
 	}
-	if err := checkTopLevelField(method, method.Output, "response_body", rule.ResponseBody); err != nil {
+	responseField, err := checkTopLevelField(method, method.Output, "response_body", rule.ResponseBody)
+	if err != nil {
 		return nil, err
 	}
 
@@ -215,11 +218,6 @@ func buildMethodDesc(g *parser.GeneratedFile, method *protogen.Method, rule *par
 	}
 
 	queries, err := parser.QueryParams(method, rule.Method, vars)
-	if err != nil {
-		return nil, err
-	}
-
-	forms, err := parser.FormParams(method)
 	if err != nil {
 		return nil, err
 	}
@@ -250,8 +248,8 @@ func buildMethodDesc(g *parser.GeneratedFile, method *protogen.Method, rule *par
 		QueryVars:     queries,
 		FormVars:      forms,
 		HeaderVars:    headers,
-		Body:          rule.Body,
-		ResponseBody:  rule.ResponseBody,
+		Body:          bodyField,
+		ResponseBody:  responseField,
 		DataResponse:  cfg.packageDesc.DataResponseType,
 		ErrorResponse: cfg.packageDesc.ErrorResponseType,
 		Stream:        isServerStream,
@@ -262,25 +260,16 @@ func buildMethodDesc(g *parser.GeneratedFile, method *protogen.Method, rule *par
 		return nil, err
 	}
 
-	bodyPath := dotPrefixedPath(parser.ProtoKeyPathToGoKeyPath(method.Input, strings.Split(rule.Body, ".")))
+	var bodyPath string
+	if bodyField != nil {
+		bodyPath = "." + bodyField.GoName
+	}
 
-	responsePath := dotPrefixedPath(parser.ProtoKeyPathToGoKeyPath(method.Output, strings.Split(rule.ResponseBody, ".")))
-
-	response := g.QualifiedGoIdent(method.Output.GoIdent)
-	if responsePath != "" {
-		responseField := parser.ProtoKeyPathToField(method.Output, strings.Split(rule.ResponseBody, "."))
-		if responseField == nil {
-			return nil, fmt.Errorf("method `%s.%s` field `%s` not found in message `%s`. File: `%s`",
-				method.Parent.Desc.Name(),
-				method.Desc.Name(),
-				responsePath,
-				method.Output.Desc.Name(),
-				method.Parent.Location.SourceFile,
-			)
-		}
+	var responsePath string
+	response := "*" + g.QualifiedGoIdent(method.Output.GoIdent)
+	if responseField != nil {
+		responsePath = "." + responseField.GoName
 		response = parser.ProtoTypeToGoType(g, responseField, true)
-	} else {
-		response = "*" + response
 	}
 	responseZero := goZeroValue(response)
 
@@ -293,8 +282,8 @@ func buildMethodDesc(g *parser.GeneratedFile, method *protogen.Method, rule *par
 	handlerWrapper := cfg.serverHandlerFunc
 	streamType := ""
 	if isServerStream {
-		handlerWrapper = g.QualifiedGoIdent(cfg.streamHandlerFunc)
-		streamType = g.QualifiedGoIdent(cfg.streamType)
+		handlerWrapper = g.QualifiedUsedGoIdent(cfg.streamHandlerFunc)
+		streamType = g.QualifiedUsedGoIdent(cfg.streamType)
 	}
 
 	return &template.MethodDesc{
@@ -331,16 +320,15 @@ func buildMethodDesc(g *parser.GeneratedFile, method *protogen.Method, rule *par
 	}, nil
 }
 
-// checkTopLevelField rejects a body or response_body selector that is not the
-// name of a top-level field of message. google.api.http requires a top-level
-// field; a nested path would make the generated handler dereference a nil
-// intermediate message, and an unknown name would bind the whole message.
-func checkTopLevelField(method *protogen.Method, message *protogen.Message, option, path string) error {
+// checkTopLevelField resolves a body or response_body selector to a direct
+// top-level field of message, rejecting nested paths, unknown names, and real
+// oneof members (which cannot be projected directly onto a Go struct field).
+func checkTopLevelField(method *protogen.Method, message *protogen.Message, option, path string) (*protogen.Field, error) {
 	if path == "" {
-		return nil
+		return nil, nil
 	}
 	if strings.Contains(path, ".") {
-		return fmt.Errorf("method `%s.%s` %s `%s` is a nested field path; google.api.http requires a top-level field of message `%s`. File: `%s`",
+		return nil, fmt.Errorf("method `%s.%s` %s `%s` is a nested field path; google.api.http requires a top-level field of message `%s`. File: `%s`",
 			method.Parent.Desc.Name(),
 			method.Desc.Name(),
 			option,
@@ -349,8 +337,9 @@ func checkTopLevelField(method *protogen.Method, message *protogen.Message, opti
 			method.Parent.Location.SourceFile,
 		)
 	}
-	if parser.ProtoKeyPathToField(message, []string{path}) == nil {
-		return fmt.Errorf("method `%s.%s` %s `%s` is not a field of message `%s`. File: `%s`",
+	field := parser.FindField(message, path)
+	if field == nil {
+		return nil, fmt.Errorf("method `%s.%s` %s `%s` is not a field of message `%s`. File: `%s`",
 			method.Parent.Desc.Name(),
 			method.Desc.Name(),
 			option,
@@ -359,7 +348,18 @@ func checkTopLevelField(method *protogen.Method, message *protogen.Message, opti
 			method.Parent.Location.SourceFile,
 		)
 	}
-	return nil
+	if field.Oneof != nil && !field.Oneof.Desc.IsSynthetic() {
+		return nil, fmt.Errorf("method `%s.%s` %s `%s` selects a member of oneof `%s` in message `%s`, which cannot be projected directly. File: `%s`",
+			method.Parent.Desc.Name(),
+			method.Desc.Name(),
+			option,
+			path,
+			field.Oneof.Desc.Name(),
+			message.Desc.Name(),
+			method.Parent.Location.SourceFile,
+		)
+	}
+	return field, nil
 }
 
 // warnFieldsOutsideBody reports the request fields left without a source when

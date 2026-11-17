@@ -160,7 +160,7 @@ func (o *Operation) Validate() error {
 		if !strings.HasPrefix(line, "//") {
 			return fmt.Errorf("raw annotation line %q must start with //", line)
 		}
-		if strings.Contains(line[2:], "\n") {
+		if strings.ContainsAny(line[2:], "\n\r") {
 			return fmt.Errorf("raw annotation line must not contain a newline: %q", line)
 		}
 	}

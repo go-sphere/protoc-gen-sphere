@@ -4,6 +4,7 @@ import (
 	"fmt"
 
 	"github.com/go-sphere/protoc-gen-sphere/generate/internal/parser"
+	"github.com/go-sphere/protoc-gen-sphere/generate/internal/template"
 	"google.golang.org/protobuf/compiler/protogen"
 )
 
@@ -14,9 +15,9 @@ const validatePackage = protogen.GoImportPath("buf.build/go/protovalidate")
 var validateErrorFunc = protogen.GoImportPath(defaultHTTPxPackage).Ident("BadRequestError")
 
 // collectGoImport emits the `var _ = ...` lines that keep referenced-but-unused
-// imports alive in the generated file, and, when any request message needs
+// imports alive in the generated file, and, when any generated method needs
 // validation, wires up the validate func on the package descriptor.
-func collectGoImport(file *protogen.File, g *parser.GeneratedFile, cfg *Config, fileCfg *fileConfig) []string {
+func collectGoImport(file *protogen.File, g *parser.GeneratedFile, cfg *Config, fileCfg *fileConfig, services []*template.ServiceDesc) []string {
 	lines := make([]string, 0)
 	didImport := make(map[protogen.GoImportPath]bool)
 	didImport[file.GoImportPath] = true
@@ -28,23 +29,28 @@ func collectGoImport(file *protogen.File, g *parser.GeneratedFile, cfg *Config, 
 	}
 	if !didImport[cfg.ServerHandlerFunc.GoImportPath] {
 		didImport[cfg.ServerHandlerFunc.GoImportPath] = true
-		lines = append(lines, fmt.Sprintf("var _ = %s[any]", g.QualifiedGoIdent(cfg.ServerHandlerFunc)))
+		lines = append(lines, fmt.Sprintf("var _ = %s[any]", g.QualifiedUsedGoIdent(cfg.ServerHandlerFunc)))
 	}
 	if !didImport[cfg.DataRespType.GoImportPath] {
 		didImport[cfg.DataRespType.GoImportPath] = true
-		lines = append(lines, fmt.Sprintf("var _ = new(%s[any])", g.QualifiedGoIdent(cfg.DataRespType)))
+		lines = append(lines, fmt.Sprintf("var _ = new(%s[any])", g.QualifiedUsedGoIdent(cfg.DataRespType)))
 	}
-LOOP:
-	for _, service := range file.Services {
-		for _, method := range service.Methods {
-			if requestNeedsValidate(method.Input) {
-				ident := validatePackage.Ident("Validate")
-				lines = append(lines, fmt.Sprintf("var _ = %s", g.QualifiedGoIdent(ident)))
-				fileCfg.packageDesc.ValidateFunc = g.QualifiedGoIdent(ident)
-				fileCfg.packageDesc.ValidateErrorFunc = g.QualifiedGoIdent(validateErrorFunc)
-				break LOOP
+	if anyNeedValidate(services) {
+		ident := validatePackage.Ident("Validate")
+		lines = append(lines, fmt.Sprintf("var _ = %s", g.QualifiedUsedGoIdent(ident)))
+		fileCfg.packageDesc.ValidateFunc = g.QualifiedUsedGoIdent(ident)
+		fileCfg.packageDesc.ValidateErrorFunc = g.QualifiedUsedGoIdent(validateErrorFunc)
+	}
+	return lines
+}
+
+func anyNeedValidate(services []*template.ServiceDesc) bool {
+	for _, sd := range services {
+		for _, md := range sd.Methods {
+			if md.NeedValidate {
+				return true
 			}
 		}
 	}
-	return lines
+	return false
 }

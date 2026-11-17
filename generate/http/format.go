@@ -71,13 +71,11 @@ func generateFileHeader(plugin *protogen.Plugin, file *protogen.File, g *protoge
 // comment lines, prefixing the first line with the method name. Empty input
 // yields an empty string.
 func formatMethodComment(methodName, leading string) string {
-	if leading == "" {
+	if strings.TrimSpace(leading) == "" {
 		return ""
 	}
+	leading = strings.ReplaceAll(leading, "\r", "")
 	cmp := strings.Split(strings.TrimSuffix(leading, "\n"), "\n")
-	if len(cmp) == 0 {
-		return ""
-	}
 	lines := []string{fmt.Sprintf("// %s %s", methodName, strings.TrimSpace(cmp[0]))}
 	for _, line := range cmp[1:] {
 		if strings.TrimSpace(line) == "" {

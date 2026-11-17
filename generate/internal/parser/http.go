@@ -2,6 +2,7 @@ package parser
 
 import (
 	"net/http"
+	"strings"
 
 	"google.golang.org/genproto/googleapis/api/annotations"
 )
@@ -35,8 +36,10 @@ func ParseHttpRule(rule *annotations.HttpRule) *HttpRule {
 		res.Path = pattern.Patch
 		res.Method = http.MethodPatch
 	case *annotations.HttpRule_Custom:
-		res.Path = pattern.Custom.Path
-		res.Method = pattern.Custom.Kind
+		if pattern.Custom != nil {
+			res.Path = pattern.Custom.Path
+			res.Method = strings.ToUpper(pattern.Custom.Kind)
+		}
 	default:
 		res.Method = http.MethodPost
 	}

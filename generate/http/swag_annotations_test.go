@@ -136,14 +136,30 @@ func TestSwagAnnotationEdgeCases(t *testing.T) {
 	t.Run("scalar_response_body", func(t *testing.T) {
 		// OK for docs: DataResponse[string] is a valid swag generic and
 		// resolves to {data: {type: string}} (verified against swag v1.16.6).
-		//
-		// BUG in the handler body (not the annotation): the response type
-		// becomes a value type (string), but the template always emits
-		// `return nil, err`, which does not compile for (string, error).
-		// See TestSwagScalarResponseBodyHandlerDoesNotCompile.
 		assertAnnotations(t, blocks, "_SwagEdgeService_ScalarResponseBody0_HTTP_Handler", []string{
 			"// @Success 200 {object} httpz.DataResponse[string]",
 			"// @Router /api/swag/scalar-response [get]",
+		})
+	})
+
+	t.Run("optional_scalar_response_body", func(t *testing.T) {
+		assertAnnotations(t, blocks, "_SwagEdgeService_OptionalScalarResponseBody0_HTTP_Handler", []string{
+			"// @Success 200 {object} httpz.DataResponse[string]",
+			"// @Router /api/swag/optional-scalar-response [get]",
+		})
+	})
+
+	t.Run("optional_enum_response_body", func(t *testing.T) {
+		assertAnnotations(t, blocks, "_SwagEdgeService_OptionalEnumResponseBody0_HTTP_Handler", []string{
+			"// @Success 200 {object} httpz.DataResponse[EdgeStatus]",
+			"// @Router /api/swag/optional-enum-response [get]",
+		})
+	})
+
+	t.Run("optional_bytes_response_body", func(t *testing.T) {
+		assertAnnotations(t, blocks, "_SwagEdgeService_OptionalBytesResponseBody0_HTTP_Handler", []string{
+			"// @Success 200 {object} httpz.DataResponse[string]",
+			"// @Router /api/swag/optional-bytes-response [get]",
 		})
 	})
 
@@ -230,6 +246,36 @@ func TestSwagScalarResponseBodyHandlerCompiles(t *testing.T) {
 	if !strings.Contains(handler, `return "", err`) {
 		t.Errorf("scalar response_body handler should return the zero string on error:\n%s", handler)
 	}
+
+	t.Run("optional_scalar_pointer", func(t *testing.T) {
+		h := extractFuncBody(t, string(content), "_SwagEdgeService_OptionalScalarResponseBody0_HTTP_Handler")
+		if !strings.Contains(h, "func(ctx httpx.Context) (*string, error)") {
+			t.Fatalf("expected (*string, error) handler signature:\n%s", h)
+		}
+		if !strings.Contains(h, "return nil, err") || !strings.Contains(h, "return out.Token, nil") {
+			t.Errorf("unexpected optional scalar response_body body:\n%s", h)
+		}
+	})
+
+	t.Run("optional_enum_pointer", func(t *testing.T) {
+		h := extractFuncBody(t, string(content), "_SwagEdgeService_OptionalEnumResponseBody0_HTTP_Handler")
+		if !strings.Contains(h, "func(ctx httpx.Context) (*EdgeStatus, error)") {
+			t.Fatalf("expected (*EdgeStatus, error) handler signature:\n%s", h)
+		}
+		if !strings.Contains(h, "return nil, err") || !strings.Contains(h, "return out.Status, nil") {
+			t.Errorf("unexpected optional enum response_body body:\n%s", h)
+		}
+	})
+
+	t.Run("optional_bytes_slice", func(t *testing.T) {
+		h := extractFuncBody(t, string(content), "_SwagEdgeService_OptionalBytesResponseBody0_HTTP_Handler")
+		if !strings.Contains(h, "func(ctx httpx.Context) ([]byte, error)") {
+			t.Fatalf("expected ([]byte, error) handler signature:\n%s", h)
+		}
+		if !strings.Contains(h, "return nil, err") || !strings.Contains(h, "return out.Data, nil") {
+			t.Errorf("unexpected optional bytes response_body body:\n%s", h)
+		}
+	})
 }
 
 // TestCustomVerbPathTreatedAsLiteral pins the custom-verb handling: a

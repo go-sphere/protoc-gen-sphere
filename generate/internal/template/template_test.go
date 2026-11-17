@@ -61,6 +61,57 @@ func TestExecuteDoesNotMutateInput(t *testing.T) {
 	}
 }
 
+func TestStdContextTypeOverrideAndFallback(t *testing.T) {
+	renderer, err := NewRenderer("")
+	if err != nil {
+		t.Fatalf("NewRenderer: %v", err)
+	}
+	methods := []*MethodDesc{
+		{Name: "Ping", Request: "Req", Reply: "Resp", Response: "*Resp", ResponseZero: "nil"},
+		{Name: "Watch", Request: "Req", Response: "*Resp", ResponseZero: "nil", IsServerStream: true, HandlerWrapperFunc: "httpz.WithSSE", StreamType: "httpz.SSEStream"},
+	}
+
+	t.Run("fallback to context.Context", func(t *testing.T) {
+		out, err := renderer.Execute(&ServiceDesc{
+			ServiceType:     "Svc",
+			Methods:         methods,
+			DistinctMethods: methods,
+			Package:         &PackageDesc{},
+		})
+		if err != nil {
+			t.Fatalf("Execute: %v", err)
+		}
+		for _, want := range []string{
+			"Ping(context.Context, *Req) (*Resp, error)",
+			"Watch(context.Context, *Req, func(*Resp) error) error",
+		} {
+			if !strings.Contains(out, want) {
+				t.Errorf("output missing %q:\n%s", want, out)
+			}
+		}
+	})
+
+	t.Run("uses StdContextType when set", func(t *testing.T) {
+		out, err := renderer.Execute(&ServiceDesc{
+			ServiceType:     "Svc",
+			Methods:         methods,
+			DistinctMethods: methods,
+			Package:         &PackageDesc{StdContextType: "context1.Context"},
+		})
+		if err != nil {
+			t.Fatalf("Execute: %v", err)
+		}
+		for _, want := range []string{
+			"Ping(context1.Context, *Req) (*Resp, error)",
+			"Watch(context1.Context, *Req, func(*Resp) error) error",
+		} {
+			if !strings.Contains(out, want) {
+				t.Errorf("output missing %q:\n%s", want, out)
+			}
+		}
+	})
+}
+
 func TestIndexMethodsLastWins(t *testing.T) {
 	first := &MethodDesc{Name: "Start", Num: 0}
 	second := &MethodDesc{Name: "Start", Num: 1}

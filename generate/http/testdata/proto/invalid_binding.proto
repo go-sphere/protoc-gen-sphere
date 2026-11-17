@@ -68,6 +68,13 @@ service InvalidService {
       body: "inner"
     };
   }
+  rpc OneofResponseBody(Empty) returns (WithOneof) {
+    option (google.api.http) = {
+      post: "/api/o2"
+      body: "*"
+      response_body: "text"
+    };
+  }
 }
 
 message Inner {

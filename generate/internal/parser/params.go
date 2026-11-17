@@ -2,6 +2,8 @@ package parser
 
 import (
 	"fmt"
+	"maps"
+	"slices"
 
 	bindingpb "github.com/go-sphere/binding/sphere/binding"
 	"google.golang.org/protobuf/compiler/protogen"
@@ -60,8 +62,7 @@ func URIParams(m *protogen.Method, route string) ([]ParamsField, error) {
 			continue
 		}
 		name := string(field.Desc.Name())
-		key, wildcard, exist := routeParamForField(name, params)
-		if exist {
+		if wildcard, exist := params[name]; exist {
 			if checkBindingLocation(m.Input, field, bindingpb.BindingLocation_BINDING_LOCATION_URI) {
 				if err := checkScalarBindable(m, field, "URI"); err != nil {
 					return nil, err
@@ -71,7 +72,7 @@ func URIParams(m *protogen.Method, route string) ([]ParamsField, error) {
 					Wildcard: wildcard,
 					Field:    field,
 				})
-				matched[key] = struct{}{}
+				matched[name] = struct{}{}
 			} else {
 				return nil, fmt.Errorf("method `%s.%s` parameter `%s` is not bound to URI, but it is used in route `%s`. File: `%s`, Field: `%s`",
 					m.Parent.Desc.Name(),
@@ -84,7 +85,7 @@ func URIParams(m *protogen.Method, route string) ([]ParamsField, error) {
 			}
 		}
 	}
-	for param := range params {
+	for _, param := range slices.Sorted(maps.Keys(params)) {
 		if _, ok := matched[param]; ok {
 			continue
 		}
@@ -258,19 +259,6 @@ func JSONFields(message *protogen.Message) []*protogen.Field {
 		}
 	}
 	return fields
-}
-
-func routeParamForField(fieldName string, params map[string]bool) (string, bool, bool) {
-	if wildcard, ok := params[fieldName]; ok {
-		return fieldName, wildcard, true
-	}
-	cleaned := cleanParamName(fieldName)
-	if cleaned != fieldName {
-		if wildcard, ok := params[cleaned]; ok {
-			return cleaned, wildcard, true
-		}
-	}
-	return "", false, false
 }
 
 func bindingLocationOf(message *protogen.Message, field *protogen.Field) bindingpb.BindingLocation {
