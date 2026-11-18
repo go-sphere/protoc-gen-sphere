@@ -7,6 +7,7 @@ import (
 	"testing"
 
 	validatepb "buf.build/gen/go/bufbuild/protovalidate/protocolbuffers/go/buf/validate"
+	bindingpb "github.com/go-sphere/binding/sphere/binding"
 	"google.golang.org/genproto/googleapis/api/annotations"
 	"google.golang.org/protobuf/compiler/protogen"
 	"google.golang.org/protobuf/proto"
@@ -449,5 +450,80 @@ func TestGenerateFile_CustomNonHTTPXRouterWithActiveValidatedRPC(t *testing.T) {
 	}
 	if !strings.Contains(src, "httpx.BadRequestError(err)") {
 		t.Errorf("expected httpx.BadRequestError(err) call:\n%s", src)
+	}
+}
+
+func TestGenerateFile_AdditionalBindingsSubsetURIAndResponseBodyNilGuard(t *testing.T) {
+	optional := descriptorpb.FieldDescriptorProto_LABEL_OPTIONAL
+	strType := descriptorpb.FieldDescriptorProto_TYPE_STRING
+
+	uriFieldOpts := &descriptorpb.FieldOptions{}
+	proto.SetExtension(uriFieldOpts, bindingpb.E_Location, bindingpb.BindingLocation_BINDING_LOCATION_URI)
+
+	getOpts := &descriptorpb.MethodOptions{}
+	proto.SetExtension(getOpts, annotations.E_Http, &annotations.HttpRule{
+		Pattern:      &annotations.HttpRule_Get{Get: "/v1/orgs/{org_id}/users/{user_id}"},
+		ResponseBody: "payload",
+		AdditionalBindings: []*annotations.HttpRule{
+			{
+				Pattern:      &annotations.HttpRule_Get{Get: "/v1/users/{user_id}"},
+				ResponseBody: "payload",
+			},
+		},
+	})
+
+	fd := &descriptorpb.FileDescriptorProto{
+		Name:    proto.String("subset_uri.proto"),
+		Package: proto.String("subset.v1"),
+		Syntax:  proto.String("proto3"),
+		Options: &descriptorpb.FileOptions{
+			GoPackage: proto.String("example.com/subset;subset"),
+		},
+		MessageType: []*descriptorpb.DescriptorProto{
+			{
+				Name: proto.String("GetUserReq"),
+				Field: []*descriptorpb.FieldDescriptorProto{
+					{Name: proto.String("org_id"), Number: proto.Int32(1), Label: &optional, Type: &strType, Options: uriFieldOpts},
+					{Name: proto.String("user_id"), Number: proto.Int32(2), Label: &optional, Type: &strType, Options: uriFieldOpts},
+				},
+			},
+			{
+				Name: proto.String("GetUserResp"),
+				Field: []*descriptorpb.FieldDescriptorProto{
+					{Name: proto.String("payload"), Number: proto.Int32(1), Label: &optional, Type: &strType},
+				},
+			},
+		},
+		Service: []*descriptorpb.ServiceDescriptorProto{{
+			Name: proto.String("UserService"),
+			Method: []*descriptorpb.MethodDescriptorProto{{
+				Name:       proto.String("GetUser"),
+				InputType:  proto.String(".subset.v1.GetUserReq"),
+				OutputType: proto.String(".subset.v1.GetUserResp"),
+				Options:    getOpts,
+			}},
+		}},
+	}
+
+	plugin := newPlugin(t, fd)
+	genFile, err := GenerateFile(plugin, plugin.Files[0], DefaultConfig())
+	if err != nil {
+		t.Fatalf("GenerateFile() error = %v", err)
+	}
+	content, err := genFile.Content()
+	if err != nil {
+		t.Fatalf("Content() error = %v", err)
+	}
+	src := string(content)
+	mustParseGo(t, "subset_uri.sphere.pb.go", content)
+	for _, want := range []string{
+		`r.Handle("GET", "/v1/orgs/:org_id/users/:user_id"`,
+		`r.Handle("GET", "/v1/users/:user_id"`,
+		"if out == nil {\n\t\t\treturn \"\", nil\n\t\t}",
+		"return out.Payload, nil",
+	} {
+		if !strings.Contains(src, want) {
+			t.Errorf("generated file missing %q\n%s", want, src)
+		}
 	}
 }

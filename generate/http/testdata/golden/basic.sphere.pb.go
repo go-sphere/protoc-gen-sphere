@@ -88,6 +88,9 @@ func _BasicService_BodyPathTest0_HTTP_Handler(srv BasicServiceHTTPServer) httpx.
 		if err != nil {
 			return nil, err
 		}
+		if out == nil {
+			return nil, nil
+		}
 		return out.Response, nil
 	})
 }

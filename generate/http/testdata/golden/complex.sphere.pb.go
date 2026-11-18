@@ -104,6 +104,9 @@ func _ComplexService_UpdateItem0_HTTP_Handler(srv ComplexServiceHTTPServer) http
 		if err != nil {
 			return nil, err
 		}
+		if out == nil {
+			return nil, nil
+		}
 		return out.Item, nil
 	})
 }

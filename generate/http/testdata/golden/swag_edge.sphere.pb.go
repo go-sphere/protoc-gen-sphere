@@ -196,6 +196,9 @@ func _SwagEdgeService_ScalarResponseBody0_HTTP_Handler(srv SwagEdgeServiceHTTPSe
 		if err != nil {
 			return "", err
 		}
+		if out == nil {
+			return "", nil
+		}
 		return out.Token, nil
 	})
 }
@@ -216,6 +219,9 @@ func _SwagEdgeService_MapResponseBody0_HTTP_Handler(srv SwagEdgeServiceHTTPServe
 		if err != nil {
 			return nil, err
 		}
+		if out == nil {
+			return nil, nil
+		}
 		return out.Labels, nil
 	})
 }
@@ -235,6 +241,9 @@ func _SwagEdgeService_ListResponseBody0_HTTP_Handler(srv SwagEdgeServiceHTTPServ
 		out, err := srv.ListResponseBody(ctx.Context(), &in)
 		if err != nil {
 			return nil, err
+		}
+		if out == nil {
+			return nil, nil
 		}
 		return out.Items, nil
 	})
@@ -304,6 +313,9 @@ func _SwagEdgeService_OptionalScalarResponseBody0_HTTP_Handler(srv SwagEdgeServi
 		if err != nil {
 			return nil, err
 		}
+		if out == nil {
+			return nil, nil
+		}
 		return out.Token, nil
 	})
 }
@@ -324,6 +336,9 @@ func _SwagEdgeService_OptionalEnumResponseBody0_HTTP_Handler(srv SwagEdgeService
 		if err != nil {
 			return nil, err
 		}
+		if out == nil {
+			return nil, nil
+		}
 		return out.Status, nil
 	})
 }
@@ -343,6 +358,9 @@ func _SwagEdgeService_OptionalBytesResponseBody0_HTTP_Handler(srv SwagEdgeServic
 		out, err := srv.OptionalBytesResponseBody(ctx.Context(), &in)
 		if err != nil {
 			return nil, err
+		}
+		if out == nil {
+			return nil, nil
 		}
 		return out.Data, nil
 	})

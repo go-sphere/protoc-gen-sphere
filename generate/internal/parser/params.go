@@ -119,6 +119,11 @@ func QueryParams(m *protogen.Method, method string, pathVars []ParamsField) ([]P
 		switch loc {
 		case bindingpb.BindingLocation_BINDING_LOCATION_HEADER:
 			continue
+		case bindingpb.BindingLocation_BINDING_LOCATION_URI:
+			if err := checkScalarBindable(m, field, "URI"); err != nil {
+				return nil, err
+			}
+			continue
 		case bindingpb.BindingLocation_BINDING_LOCATION_FORM:
 			// A body-less request carries no form payload, and the adapters
 			// disagree on whether BindForm falls back to the query string.

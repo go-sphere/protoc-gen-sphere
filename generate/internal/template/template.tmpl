@@ -77,6 +77,11 @@ func _{{$svrType}}_{{.Name}}{{.Num}}_HTTP_Handler(srv {{$svrType}}HTTPServer) {{
 		if err != nil {
 			return {{.ResponseZero}}, err
 		}
+		{{- if .ResponseBody}}
+		if out == nil {
+			return {{.ResponseZero}}, nil
+		}
+		{{- end}}
 		return out{{.ResponseBody}}, nil
 		{{- end}}
 	})
