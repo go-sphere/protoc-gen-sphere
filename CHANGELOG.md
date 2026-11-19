@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+## v0.0.7 (2026-11-19)
+
 ### Added
 
 - Tests run the route grammar fixture shared with httpx
